@@ -3,6 +3,9 @@ import cors from "cors";
 import morgan from "morgan";
 import { env } from "./config/env";
 import { authRouter } from "./routes/auth.routes";
+import { creatorProfileRouter } from "./routes/creatorProfile.routes";
+import { newsletterRouter } from "./routes/newsletter.routes";
+import { publicRouter } from "./routes/public.routes";
 const app = express();
 
 app.use(cors({ origin: "*", credentials: false }));
@@ -16,7 +19,9 @@ app.get("/api/v1/health", (_req, res) => {
 
 // Routes
 app.use("/api/v1/auth", authRouter);
-
+app.use("/api/v1/creator-profile", creatorProfileRouter);
+app.use("/api/v1/newsletters", newsletterRouter);
+app.use("/api/v1/public", publicRouter);
 // Global error handler (basic)
 app.use(
   (
