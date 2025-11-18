@@ -1,0 +1,10 @@
+# docker-compose.yml
+services:
+  db:
+    image: postgres:16
+    container_name: postgres-newsletter
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Hamraan@2011
+      POSTGRES_DB: newsletter
+    ports: ["5432:5432"]
