@@ -6,6 +6,8 @@ import { authRouter } from "./routes/auth.routes";
 import { creatorProfileRouter } from "./routes/creatorProfile.routes";
 import { newsletterRouter } from "./routes/newsletter.routes";
 import { publicRouter } from "./routes/public.routes";
+import { subscriptionRouter } from "./routes/subscription.routes";
+import { followRouter } from "./routes/follow.routes";
 const app = express();
 
 app.use(cors({ origin: "*", credentials: false }));
@@ -22,6 +24,8 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/creator-profile", creatorProfileRouter);
 app.use("/api/v1/newsletters", newsletterRouter);
 app.use("/api/v1/public", publicRouter);
+app.use("/api", subscriptionRouter);       
+app.use("/api/v1/creators", followRouter); 
 // Global error handler (basic)
 app.use(
   (
