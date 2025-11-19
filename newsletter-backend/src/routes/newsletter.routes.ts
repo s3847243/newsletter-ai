@@ -7,7 +7,7 @@ import {
   updateMyNewsletter,
 } from "../controllers/newsletter.controller";
 import { requireAuth } from "../middlewares/auth";
-
+import { publishNewsletter } from "../controllers/publish.controller";
 export const newsletterRouter = Router();
 
 newsletterRouter.use(requireAuth);
@@ -17,3 +17,6 @@ newsletterRouter.post("/", createNewsletter);
 newsletterRouter.get("/:id", getMyNewsletterById);
 newsletterRouter.patch("/:id", updateMyNewsletter);
 newsletterRouter.delete("/:id", deleteMyNewsletter);
+
+// NEW:
+newsletterRouter.post("/:id/publish", publishNewsletter);

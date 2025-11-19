@@ -8,6 +8,8 @@ import { newsletterRouter } from "./routes/newsletter.routes";
 import { publicRouter } from "./routes/public.routes";
 import { subscriptionRouter } from "./routes/subscription.routes";
 import { followRouter } from "./routes/follow.routes";
+import { timelineRouter } from "./routes/timeline.routes";
+import { aiRouter } from "./routes/ai.routes";
 const app = express();
 
 app.use(cors({ origin: "*", credentials: false }));
@@ -26,6 +28,9 @@ app.use("/api/v1/newsletters", newsletterRouter);
 app.use("/api/v1/public", publicRouter);
 app.use("/api", subscriptionRouter);       
 app.use("/api/v1/creators", followRouter); 
+app.use("/api/v1/timeline", timelineRouter);   // GET /api/timeline
+app.use("/api/v1/ai", aiRouter);               // AI endpoints
+
 // Global error handler (basic)
 app.use(
   (
