@@ -31,7 +31,7 @@ export const subscribe = async (req: Request, res: Response, next: NextFunction)
     if (!creatorId) {
       return res.status(404).json({ message: "Creator not found" });
     }
-
+    
     const existing = await prisma.subscriber.findFirst({
       where: {
         creatorId,

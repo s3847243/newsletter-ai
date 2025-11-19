@@ -64,7 +64,7 @@ export const getPublicIssueByHandleAndSlug = async (
       return res.status(404).json({ message: "Issue not found" });
     }
 
-    // Increment view count (fire & forget style)
+    
     await prisma.newsletterIssue.update({
       where: { id: issue.id },
       data: { viewCount: issue.viewCount + 1 },

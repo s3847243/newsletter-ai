@@ -20,7 +20,7 @@ export const followCreator = async (
       return res.status(404).json({ message: "Creator not found" });
     }
 
-    // Optional: prevent following yourself (if you like)
+    // prevent following yourself 
     if (creator.userId === userId) {
       return res.status(400).json({ message: "You cannot follow yourself" });
     }
@@ -37,7 +37,7 @@ export const followCreator = async (
     if (existing) {
       return res.status(200).json({ message: "Already following" });
     }
-
+    
     const follow = await prisma.follow.create({
       data: {
         followerId: userId,
