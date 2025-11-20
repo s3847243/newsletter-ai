@@ -52,7 +52,7 @@ export default function DashboardHome() {
           </p>
         </div>
         <Link
-          href="/dashboard/newsletters/new"
+          href="/dashboard/newsletter/new"
           className="px-3 py-2 rounded bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
         >
           New issue
@@ -70,7 +70,7 @@ export default function DashboardHome() {
         <p className="text-sm text-gray-600">
           You don&apos;t have any issues yet.{" "}
           <Link
-            href="/dashboard/newsletters/new"
+            href="/dashboard/newsletter/new"
             className="text-indigo-600 hover:underline"
           >
             Create your first one.
@@ -118,7 +118,7 @@ export default function DashboardHome() {
                   </td>
                   <td className="px-4 py-2 text-right">
                     <Link
-                      href={`/dashboard/newsletters/${issue.id}`}
+                      href={`/dashboard/newsletter/${issue.id}`}
                       className="text-indigo-600 hover:underline text-sm"
                     >
                       Edit

@@ -37,7 +37,7 @@ export default function NewIssuePage() {
         accessToken
       );
 
-      router.push(`/dashboard/newsletters/${issue.id}`);
+      router.push(`/dashboard/newsletter/${issue.id}`);
     } catch (err: any) {
       const apiErr = err as ApiError;
       setError(apiErr.message || "Failed to create issue");
