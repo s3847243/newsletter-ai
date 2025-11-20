@@ -3,8 +3,7 @@ import { CreatorPublic } from "@/types/creator";
 import Link from "next/link";
 import { NewsletterIssue } from "@/types/creator";
 import { SubscribeForm } from "@/components/SubscribeForm";
-import { FollowButton } from "@/components/FollowButton";
-import { PublicIssueSummary,PublicIssuesResponse } from "@/types/creator";
+
 async function getCreator(handle: string): Promise<CreatorPublic | null> {
   const res = await fetch(`${API_BASE_URL}/public/creators/${handle}`, {
     next: { revalidate: 60 },
@@ -16,21 +15,9 @@ async function getCreator(handle: string): Promise<CreatorPublic | null> {
   return (await res.json()) as CreatorPublic;
 }
 
-
-async function getRecentIssues(handle: string): Promise<PublicIssueSummary[]> {
-  const res = await fetch(
-    `${API_BASE_URL}/public/creators/${handle}/issues?page=1&pageSize=10`,
-    {
-      next: { revalidate: 60 },
-    }
-  );
-
-  if (!res.ok) {
-    return [];
-  }
-
-  const data = (await res.json()) as PublicIssuesResponse;
-  return data.items;
+// we still don't list issues yet
+async function getRecentIssues(handle: string): Promise<NewsletterIssue[]> {
+  return [];
 }
 
 export default async function PublicCreatorPage({
@@ -39,10 +26,7 @@ export default async function PublicCreatorPage({
   params: { handle: string };
 }) {
   const handle = params.handle;
-  const [creator, issues] = await Promise.all([
-    getCreator(handle),
-    getRecentIssues(handle),
-  ]);
+  const creator = await getCreator(handle);
 
   if (!creator) {
     return (
@@ -108,12 +92,6 @@ export default async function PublicCreatorPage({
               <span>{creator._count.subscribers} email subscribers</span>
               <span>{creator._count.newsletters} issues</span>
             </div>
-            <div className="mt-3">
-                <FollowButton
-                    creatorId={creator.id}
-                    initialIsFollowing={creator.isFollowing ?? false}
-                />
-            </div>
           </div>
         </section>
 
@@ -127,41 +105,11 @@ export default async function PublicCreatorPage({
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold">Recent issues</h2>
-
-          {issues.length === 0 && (
-            <p className="text-xs text-gray-500">
-              This creator hasn&apos;t published any issues yet.
-            </p>
-          )}
-
-          {issues.length > 0 && (
-            <div className="space-y-2">
-              {issues.map((issue) => (
-                <Link
-                  key={issue.id}
-                  href={`/${handle}/${issue.slug}`}
-                  className="block border rounded-lg bg-white p-3 hover:bg-gray-50"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-medium">{issue.title}</h3>
-                    {issue.publishedAt && (
-                      <span className="text-[11px] text-gray-500">
-                        {new Date(issue.publishedAt).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  {issue.emailIntro && (
-                    <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                      {issue.emailIntro}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-gray-400 mt-1">
-                    {issue.viewCount} views
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
+          <p className="text-xs text-gray-500">
+            To show actual issues here, you can later add a backend endpoint
+            like <code>/api/public/creators/:handle/issues</code> and render
+            them.
+          </p>
         </section>
       </main>
     </div>

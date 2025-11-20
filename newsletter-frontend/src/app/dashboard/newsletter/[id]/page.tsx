@@ -42,6 +42,8 @@ export default function EditIssuePage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [copilotInput, setCopilotInput] = useState("");
+  const [aiSubjectLoading, setAiSubjectLoading] = useState(false);
+  const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +208,42 @@ export default function EditIssuePage() {
     }
   };
 
+  // --- AI: subject lines ---
+
+  const runSubjectLines = async () => {
+    if (!accessToken) return;
+    if (!title.trim() && !emailIntro.trim()) {
+      setError("Add a title or intro so AI can generate subject lines.");
+      return;
+    }
+    setError(null);
+    setAiSubjectLoading(true);
+    try {
+      const resp = await apiFetch<{
+        subjectLines: string[];
+        raw: string;
+      }>(
+        "/ai/subject-lines",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            title: title || undefined,
+            summary: emailIntro || undefined,
+            audience: "newsletter subscribers",
+            count: 5,
+          }),
+        },
+        accessToken
+      );
+      setSubjectSuggestions(resp.subjectLines);
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      setError(apiErr.message || "AI subject line generation failed");
+    } finally {
+      setAiSubjectLoading(false);
+    }
+  };
+
   // --- AI: copilot chat ---
 
   const sendCopilotMessage = async () => {
@@ -254,7 +292,10 @@ export default function EditIssuePage() {
     }
   };
 
-  const insertAtCursor = (text: string, mode: "append" | "cursor" = "cursor") => {
+  const insertAtCursor = (
+    text: string,
+    mode: "append" | "cursor" = "cursor"
+  ) => {
     const textarea = textareaRef.current;
     if (!textarea) {
       setHtmlContent((prev) =>
@@ -282,6 +323,28 @@ export default function EditIssuePage() {
 
     requestAnimationFrame(() => {
       textarea.focus();
+      textarea.setSelectionRange(cursorPos, cursorPos);
+    });
+  };
+
+  const replaceSelectionWith = (text: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      insertAtCursor(text, "cursor");
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    const newContent =
+      htmlContent.slice(0, start) + text + htmlContent.slice(end);
+
+    setHtmlContent(newContent);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const cursorPos = start + text.length;
       textarea.setSelectionRange(cursorPos, cursorPos);
     });
   };
@@ -371,15 +434,44 @@ export default function EditIssuePage() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Email subject
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium">
+                  Email subject
+                </label>
+                <button
+                  type="button"
+                  onClick={runSubjectLines}
+                  disabled={aiSubjectLoading}
+                  className="text-[11px] text-indigo-600 hover:underline disabled:opacity-60"
+                >
+                  {aiSubjectLoading ? "Generating..." : "AI: suggest subjects"}
+                </button>
+              </div>
               <input
                 type="text"
                 className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-indigo-200"
                 value={emailSubject}
                 onChange={(e) => setEmailSubject(e.target.value)}
               />
+              {subjectSuggestions.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-[11px] text-gray-500">
+                    Click a suggestion to use it:
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {subjectSuggestions.map((s, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setEmailSubject(s)}
+                        className="px-2 py-1 rounded border text-[11px] hover:bg-gray-50"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
@@ -451,7 +543,7 @@ export default function EditIssuePage() {
               onChange={(e) => setHtmlContent(e.target.value)}
             />
             <p className="text-xs text-gray-500">
-              Select some text and click an AI rewrite button to transform that
+              Select text and click an AI rewrite button to transform just that
               selection.
             </p>
           </div>
@@ -504,7 +596,7 @@ export default function EditIssuePage() {
                 </p>
                 <p className="whitespace-pre-wrap">{m.content}</p>
                 {m.role === "assistant" && (
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-2">
                     <button
                       type="button"
                       onClick={() => insertAtCursor(m.content, "cursor")}
@@ -518,6 +610,13 @@ export default function EditIssuePage() {
                       className="px-2 py-1 border rounded text-[11px] hover:bg-white"
                     >
                       Append at bottom
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => replaceSelectionWith(m.content)}
+                      className="px-2 py-1 border rounded text-[11px] hover:bg-white"
+                    >
+                      Replace selection
                     </button>
                   </div>
                 )}

@@ -27,6 +27,8 @@ export interface NewsletterIssue {
   updatedAt: string;
 }
 
+
+
 export interface CreatorPublicCounts {
   followers: number;
   subscribers: number;
@@ -39,5 +41,21 @@ export interface CreatorPublic extends CreatorProfile {
     image?: string | null;
   } | null;
   _count: CreatorPublicCounts;
+  isFollowing?: boolean; // optional, used later by Follow button
 }
 
+export interface PublicIssueSummary {
+  id: string;
+  title: string;
+  slug: string;
+  publishedAt?: string | null;
+  viewCount: number;
+  emailIntro?: string | null;
+}
+
+export interface PublicIssuesResponse {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: PublicIssueSummary[];
+}
