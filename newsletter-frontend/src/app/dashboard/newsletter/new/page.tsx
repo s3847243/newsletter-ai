@@ -1,278 +1,587 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { apiFetch, ApiError } from "@/lib/apiClient";
-import { NewsletterIssue } from "@/types/creator";
-import { useRouter } from "next/navigation";
-import { RichTextEditor } from "@/components/RichTextEditor";
+import { useState, useRef, useEffect } from "react";
+import { Sparkles, Check, X, Loader2, Bold, Italic, List, Code, Link, Image } from "lucide-react";
 
 type CopilotMessage = {
   role: "user" | "assistant";
   content: string;
+  id: string;
 };
 
-const DEFAULT_HTML = "<p></p>";
-
-export default function NewIssuePage() {
-  const { accessToken } = useAuth();
-  const router = useRouter();
-
+export default function NotionStyleEditor() {
   const [title, setTitle] = useState("");
-  const [htmlContent, setHtmlContent] = useState(DEFAULT_HTML);
-  const [emailSubject, setEmailSubject] = useState("");
-  const [emailIntro, setEmailIntro] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Copilot state
+  const editorRef = useRef<HTMLDivElement>(null);
+  
+  // AI Copilot state
+  const [showCopilot, setShowCopilot] = useState(false);
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [copilotLoading, setCopilotLoading] = useState(false);
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!accessToken) return;
-    setSaving(true);
-    setError(null);
+  // Formatting state
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkText, setLinkText] = useState("");
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageAlt, setImageAlt] = useState("");
 
-    try {
-      const issue = await apiFetch<NewsletterIssue>(
-        "/newsletters",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            title,
-            htmlContent,
-            emailSubject: emailSubject || undefined,
-            emailIntro: emailIntro || undefined,
-          }),
-        },
-        accessToken
-      );
-
-      router.push(`/dashboard/newsletters/${issue.id}`);
-    } catch (err: any) {
-      const apiErr = err as ApiError;
-      setError(apiErr.message || "Failed to create issue");
-    } finally {
-      setSaving(false);
+  useEffect(() => {
+    // Initialize with a paragraph if empty
+    if (editorRef.current && !editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = '<p><br></p>';
     }
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const htmlContent = editorRef.current?.innerHTML || "";
+    console.log("Saving:", { title, htmlContent });
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setSaving(false);
+  };
+
+  const execCommand = (command: string, value: string | undefined = undefined) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+  };
+
+  const formatBold = () => execCommand('bold');
+  const formatItalic = () => execCommand('italic');
+  const formatCode = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString();
+    
+    // Create a code block container
+    const pre = document.createElement('pre');
+    pre.className = 'code-block';
+    pre.contentEditable = 'true';
+    pre.textContent = selectedText || 'Write your code here...';
+    
+    range.deleteContents();
+    range.insertNode(pre);
+    
+    // Add line breaks before and after
+    const br1 = document.createElement('br');
+    const br2 = document.createElement('br');
+    pre.parentNode?.insertBefore(br1, pre);
+    pre.parentNode?.insertBefore(br2, pre.nextSibling);
+    
+    // Place cursor inside
+    const newRange = document.createRange();
+    newRange.selectNodeContents(pre);
+    newRange.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+    
+    editorRef.current?.focus();
+  };
+
+  const formatList = () => execCommand('insertUnorderedList');
+
+  const insertLink = () => {
+    if (!linkUrl) return;
+    const text = linkText || linkUrl;
+    const html = `<a href="${linkUrl}" class="editor-link" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    execCommand('insertHTML', html);
+    setShowLinkModal(false);
+    setLinkUrl("");
+    setLinkText("");
+  };
+
+const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  // Bold / italic shortcuts first
+              if (e.ctrlKey || e.metaKey) {
+              if (e.key === 'b') {
+                e.preventDefault();
+                formatBold();
+                return;
+              } else if (e.key === 'i') {
+                e.preventDefault();
+                formatItalic();
+                return;
+              }
+            }
+
+            if (e.key !== "Enter") return;
+
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+
+            const range = selection.getRangeAt(0);
+
+            // Find the parent block element (p, div, or li)
+            let node: Node | null = range.startContainer;
+            let currentLine: HTMLElement | null = null;
+
+            while (node && node !== editorRef.current) {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                const tag = (node as HTMLElement).tagName.toLowerCase();
+                if (tag === "p" || tag === "div" || tag === "li") {
+                  currentLine = node as HTMLElement;
+                  break;
+                }
+              }
+              node = node.parentNode;
+            }
+
+            if (!currentLine) return;
+
+            // Get the FULL text content of the line (ignore formatting)
+            const lineText = (currentLine.textContent || "").trim();
+            
+            console.log("Line text:", lineText);
+            
+            // Check if line starts with "number. "
+            const match = lineText.match(/^(\d+)\.\s*/);
+            if (!match) {
+              return; // Not a numbered list
+            }
+
+            e.preventDefault();
+
+            const currentNumber = parseInt(match[1], 10);
+            const nextNumber = currentNumber + 1;
+
+            console.log("Current number:", currentNumber, "Next:", nextNumber);
+
+            // Create new paragraph with the next number
+            const newLine = document.createElement("p");
+            newLine.innerHTML = `${nextNumber}. `;
+
+            // Insert after current line
+            if (currentLine.nextSibling) {
+              currentLine.parentNode?.insertBefore(newLine, currentLine.nextSibling);
+            } else {
+              currentLine.parentNode?.appendChild(newLine);
+            }
+
+            // Set cursor at the end of the new line
+            const newRange = document.createRange();
+            newRange.selectNodeContents(newLine);
+            newRange.collapse(false);
+
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+            
+            console.log("Created new line with:", newLine.textContent);
+};
+
+
+
+  const insertImage = () => {
+    if (!imageUrl) return;
+    const html = `<img src="${imageUrl}" alt="${imageAlt || 'image'}" class="editor-image" />`;
+    execCommand('insertHTML', html);
+    setShowImageModal(false);
+    setImageUrl("");
+    setImageAlt("");
   };
 
   const sendToCopilot = async () => {
-    if (!accessToken) return;
     const prompt = copilotInput.trim();
     if (!prompt) return;
 
-    setError(null);
+    const userMsg: CopilotMessage = {
+      role: "user",
+      content: prompt,
+      id: Date.now().toString(),
+    };
+
+    setCopilotMessages(prev => [...prev, userMsg]);
+    setCopilotInput("");
     setCopilotLoading(true);
 
-    const newMessages: CopilotMessage[] = [
-      ...copilotMessages,
-      { role: "user", content: prompt },
-    ];
-    setCopilotMessages(newMessages);
-    setCopilotInput("");
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    const aiMsg: CopilotMessage = {
+      role: "assistant",
+      content: `Here's a draft based on your request: "${prompt}"\n\nConsistent writing beats motivation every time. While motivation is fleeting and unpredictable, showing up daily—even when uninspired—builds momentum and skill. The writer who produces imperfect work regularly will always outpace the one waiting for the perfect mood.`,
+      id: (Date.now() + 1).toString(),
+    };
 
-    try {
-      const resp = await apiFetch<{ reply: string }>(
-        "/ai/copilot",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            messages: newMessages,
-            context: {
-              title: title || undefined,
-              audience: "newsletter subscribers",
-              tone: "conversational, helpful",
-              currentContent: htmlContent,
-            },
-          }),
-        },
-        accessToken
-      );
+    setCopilotMessages(prev => [...prev, aiMsg]);
+    setCopilotLoading(false);
+  };
 
-      const reply = resp.reply;
-      setCopilotMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: reply },
-      ]);
-    } catch (err: any) {
-      const apiErr = err as ApiError;
-      setError(apiErr.message || "AI copilot failed");
-    } finally {
-      setCopilotLoading(false);
+  const acceptSuggestion = (message: CopilotMessage) => {
+    if (!editorRef.current) return;
+    const formattedContent = message.content.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
+    editorRef.current.innerHTML += formattedContent;
+    setCopilotMessages([]);
+    setShowCopilot(false);
+  };
+
+  const rejectSuggestion = () => {
+    const lastAssistant = [...copilotMessages].reverse().find(m => m.role === "assistant");
+    if (lastAssistant) {
+      setCopilotMessages(prev => prev.filter(m => m.id !== lastAssistant.id));
     }
   };
 
-  const acceptLastAssistant = () => {
-    const last = [...copilotMessages].reverse().find((m) => m.role === "assistant");
-    if (!last) return;
-
-    // Wrap AI text in a paragraph; you can improve with markdown → HTML later
-    const aiHtml = `<p>${last.content.replace(/\n/g, "<br />")}</p>`;
-
-    setHtmlContent((prev) => {
-      if (!prev || prev === DEFAULT_HTML || prev === "<p></p>") {
-        return aiHtml;
-      }
-      // Append below existing content
-      return prev + "\n\n" + aiHtml;
-    });
-  };
-
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col">
-      {/* Top header */}
-      <div className="border-b border-gray-200 pb-4">
-        <div className="max-w-4xl space-y-1">
-          <h2 className="text-xl font-semibold">New issue</h2>
-          <p className="text-sm text-gray-600">
-            A Notion-like editor with an AI copilot. Click in the title area and
-            start writing.
-          </p>
+    <div className="min-h-screen bg-white">
+      <style jsx global>{`
+        .editor-content {
+          outline: none;
+        }
+        .editor-content p {
+          margin: 0.5em 0;
+        }
+        .editor-content strong {
+          font-weight: 700;
+          color: #111827;
+        }
+        .editor-content em {
+          font-style: italic;
+          color: #374151;
+        }
+        .editor-content .inline-code, .editor-content code {
+          background: #f3f4f6;
+          border: 1px solid #e5e7eb;
+          border-radius: 4px;
+          padding: 2px 6px;
+          font-family: 'Monaco', 'Menlo', monospace;
+          font-size: 0.9em;
+          color: #dc2626;
+        }
+        .editor-content .code-block {
+          background: #1e293b;
+          border: 1px solid #334155;
+          border-radius: 8px;
+          padding: 16px;
+          font-family: 'Monaco', 'Menlo', monospace;
+          font-size: 0.9em;
+          color: #e2e8f0;
+          overflow-x: auto;
+          white-space: pre;
+          margin: 1em 0;
+          min-height: 100px;
+          display: block;
+        }
+        .editor-content .code-block:focus {
+          outline: 2px solid #7c3aed;
+          outline-offset: 2px;
+        }
+        .editor-content ul {
+          list-style: disc;
+          padding-left: 1.5em;
+          margin: 0.5em 0;
+        }
+        .editor-content li {
+          margin: 0.25em 0;
+        }
+        .editor-content .editor-link {
+          color: #7c3aed;
+          text-decoration: underline;
+          cursor: pointer;
+        }
+        .editor-content .editor-link:hover {
+          color: #6d28d9;
+        }
+        .editor-content .editor-image {
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          margin: 1em 0;
+          display: block;
+        }
+      `}</style>
+
+      {/* Top bar */}
+      <div className="fixed top-0 left-64 right-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-8 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowCopilot(!showCopilot)}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                showCopilot
+                  ? "bg-purple-100 text-purple-700"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              AI Copilot
+            </button>
+            <span className="text-xs text-neutral-400">
+              {showCopilot ? "AI assistant active" : "Press to get writing help"}
+            </span>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded-lg bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-1 flex-col gap-4 pt-4">
-        {error && (
-          <div className="max-w-4xl text-sm text-red-600 bg-red-50 border border-red-100 rounded p-2">
-            {error}
+      {/* Main editor area */}
+      <div className="mx-auto max-w-4xl px-8 pt-24 pb-32">
+        {/* Title */}
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Untitled"
+          className="w-full border-none bg-transparent text-5xl font-bold text-neutral-900 placeholder:text-neutral-300 focus:outline-none"
+        />
+
+        {/* Formatting Toolbar */}
+        <div className="sticky top-20 z-40 mt-6 flex items-center gap-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-sm">
+          <button
+            onClick={formatBold}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            title="Bold (Ctrl+B)"
+          >
+            <Bold className="h-4 w-4" />
+          </button>
+          <button
+            onClick={formatItalic}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            title="Italic (Ctrl+I)"
+          >
+            <Italic className="h-4 w-4" />
+          </button>
+          <button
+            onClick={formatList}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            title="Bullet List"
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            onClick={formatCode}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            title="Inline Code"
+          >
+            <Code className="h-4 w-4" />
+          </button>
+          <div className="h-6 w-px bg-neutral-200" />
+          <button
+            onClick={() => setShowLinkModal(true)}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            title="Insert Link"
+          >
+            <Link className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setShowImageModal(true)}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            title="Insert Image"
+          >
+            <Image className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Rich Text Editor */}
+        <div
+          ref={editorRef}
+          contentEditable
+          className="editor-content mt-4 min-h-[500px] text-base leading-relaxed text-neutral-700 focus:outline-none"
+          data-placeholder="Start writing... or ask the AI copilot for help"
+          style={{
+            minHeight: "500px",
+          }}
+          onKeyDown={handleEditorKeyDown}
+        />
+
+        {/* AI Copilot Panel */}
+        {showCopilot && (
+          <div className="mt-8 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 p-6 shadow-lg">
+            <div className="mb-4 flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              <h3 className="text-lg font-semibold text-neutral-900">AI Writing Assistant</h3>
+            </div>
+
+            <div className="mb-4 max-h-80 space-y-3 overflow-y-auto">
+              {copilotMessages.length === 0 && (
+                <p className="text-sm text-neutral-500">
+                  Ask me to help you write something. For example: "Write an opening paragraph about the importance of consistent writing"
+                </p>
+              )}
+              
+              {copilotMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-lg px-4 py-2.5 ${
+                      msg.role === "user"
+                        ? "bg-purple-600 text-white"
+                        : "bg-white border border-neutral-200 text-neutral-900"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {msg.content}
+                    </p>
+                    
+                    {msg.role === "assistant" && (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => acceptSuggestion(msg)}
+                          className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          Accept
+                        </button>
+                        <button
+                          onClick={rejectSuggestion}
+                          className="flex items-center gap-1.5 rounded-md bg-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-300"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {copilotLoading && (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
+                    <span className="text-sm text-neutral-600">Writing...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={copilotInput}
+                onChange={(e) => setCopilotInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendToCopilot();
+                  }
+                }}
+                placeholder="Ask AI to write something..."
+                className="flex-1 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              />
+              <button
+                onClick={sendToCopilot}
+                disabled={copilotLoading || !copilotInput.trim()}
+                className="rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                {copilotLoading ? "..." : "Ask"}
+              </button>
+            </div>
           </div>
         )}
+      </div>
 
-        <div className="flex flex-1 flex-col gap-4 lg:flex-row">
-          {/* Main editor area */}
-          <div className="flex-1">
-            <div className="mx-auto max-w-4xl rounded-2xl bg-gray-50 p-4">
-              <div className="space-y-4">
-                {/* Title as big heading */}
-                <input
-                  type="text"
-                  className="w-full border-none bg-transparent text-3xl font-semibold tracking-tight text-gray-900 placeholder:text-gray-300 focus:outline-none focus:ring-0"
-                  placeholder="Click here to add a title..."
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-
-                {/* Rich text body */}
-                <RichTextEditor
-                  value={htmlContent}
-                  onChange={setHtmlContent}
-                />
-
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Content is stored as HTML in the database. Later you can add
-                  rendering guards or markdown support.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Side metadata / save */}
-          <div className="w-full max-w-xs space-y-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+      {/* Link Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-4 text-lg font-semibold text-neutral-900">Insert Link</h3>
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium mb-1">
-                  Email subject
-                </label>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">Link Text</label>
                 <input
                   type="text"
-                  className="w-full border rounded px-3 py-2 text-xs focus:outline-none focus:ring focus:ring-indigo-200"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Subject line (optional)"
+                  value={linkText}
+                  onChange={(e) => setLinkText(e.target.value)}
+                  placeholder="Click here"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1">
-                  Email intro
-                </label>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">URL</label>
                 <input
-                  type="text"
-                  className="w-full border rounded px-3 py-2 text-xs focus:outline-none focus:ring focus:ring-indigo-200"
-                  value={emailIntro}
-                  onChange={(e) => setEmailIntro(e.target.value)}
-                  placeholder="Short intro for the email body"
+                  type="url"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  autoFocus
                 />
               </div>
             </div>
-
-            <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-              <p className="text-xs text-gray-600">
-                Save this as a draft now. You can refine and publish from the
-                editor or dashboard later.
-              </p>
+            <div className="mt-6 flex justify-end gap-2">
               <button
-                type="submit"
-                disabled={saving}
-                className="w-full px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 disabled:opacity-60"
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setLinkUrl("");
+                  setLinkText("");
+                }}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
               >
-                {saving ? "Creating..." : "Create draft"}
+                Cancel
+              </button>
+              <button
+                onClick={insertLink}
+                disabled={!linkUrl}
+                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                Insert
               </button>
             </div>
           </div>
         </div>
-      </form>
+      )}
 
-      {/* Copilot dock */}
-      <div className="mt-4 border-t border-gray-200 bg-gray-50">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3 px-2 py-3">
-          {/* Chat history */}
-          <div className="max-h-40 overflow-y-auto space-y-2 text-xs">
-            {copilotMessages.length === 0 && (
-              <p className="text-[11px] text-gray-500">
-                Describe what you want to write. For example: &quot;Draft a 400
-                word intro about why consistent writing beats motivation.&quot;
-              </p>
-            )}
-            {copilotMessages.map((m, idx) => (
-              <div
-                key={idx}
-                className={`max-w-full rounded-lg px-3 py-2 ${
-                  m.role === "user"
-                    ? "ml-auto bg-indigo-600 text-white"
-                    : "mr-auto bg-white border border-gray-200 text-gray-900"
-                }`}
-              >
-                <p className="whitespace-pre-wrap text-[11px]">{m.content}</p>
-                {m.role === "assistant" && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={acceptLastAssistant}
-                      className="rounded border border-gray-300 bg-gray-100 px-2 py-1 text-[10px] text-gray-800 hover:bg-gray-200"
-                    >
-                      Insert into editor
-                    </button>
-                  </div>
-                )}
+      {/* Image Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-4 text-lg font-semibold text-neutral-900">Insert Image</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">Image URL</label>
+                <input
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                  autoFocus
+                />
               </div>
-            ))}
-          </div>
-
-          {/* Prompt input */}
-          <div className="flex items-end gap-2">
-            <textarea
-              className="flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring focus:ring-indigo-200"
-              rows={2}
-              placeholder="Tell the copilot what you want to write..."
-              value={copilotInput}
-              onChange={(e) => setCopilotInput(e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={sendToCopilot}
-              disabled={copilotLoading || !copilotInput.trim() || !accessToken}
-              className="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-3 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {copilotLoading ? "Thinking..." : "Ask Copilot"}
-            </button>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">Alt Text (optional)</label>
+                <input
+                  type="text"
+                  value={imageAlt}
+                  onChange={(e) => setImageAlt(e.target.value)}
+                  placeholder="Description of image"
+                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowImageModal(false);
+                  setImageUrl("");
+                  setImageAlt("");
+                }}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={insertImage}
+                disabled={!imageUrl}
+                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                Insert
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

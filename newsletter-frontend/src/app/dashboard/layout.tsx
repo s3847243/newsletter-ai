@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           Log out
         </button>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

@@ -12,7 +12,11 @@ interface RichTextEditorProps {
   className?: string;
 }
 
-export function RichTextEditor({ value, onChange, className }: RichTextEditorProps) {
+export function RichTextEditor({
+  value,
+  onChange,
+  className,
+}: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -29,21 +33,23 @@ export function RichTextEditor({ value, onChange, className }: RichTextEditorPro
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none focus:outline-none text-gray-900 dark:text-gray-50",
+          "prose prose-sm max-w-none focus:outline-none text-neutral-900",
       },
     },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       onChange(html);
     },
+    // Important for Next.js SSR
+    immediatelyRender: false,
   });
 
-  // Keep editor in sync if external value changes (e.g. when AI inserts)
+  // Keep editor in sync when external value changes (e.g. AI inserts)
   useEffect(() => {
     if (!editor) return;
     const current = editor.getHTML();
     if (current !== value) {
-editor.commands.setContent(value, { emitUpdate: false });
+      editor.commands.setContent(value, { emitUpdate: false });
     }
   }, [value, editor]);
 
@@ -52,13 +58,13 @@ editor.commands.setContent(value, { emitUpdate: false });
   return (
     <div
       className={clsx(
-        "rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm",
+        "rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm",
         className
       )}
     >
-      {/* Minimal toolbar */}
-      <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-gray-200 pb-2 text-xs">
-        <span className="mr-1 text-[11px] font-medium text-gray-500">
+      {/* Tiny toolbar */}
+      <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-neutral-200 pb-2 text-xs">
+        <span className="mr-1 text-[11px] font-medium text-neutral-500">
           Format
         </span>
         <button
@@ -67,8 +73,8 @@ editor.commands.setContent(value, { emitUpdate: false });
           className={clsx(
             "rounded px-2 py-0.5",
             editor.isActive("bold")
-              ? "bg-gray-800 text-white"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-700 hover:bg-neutral-100"
           )}
         >
           B
@@ -79,8 +85,8 @@ editor.commands.setContent(value, { emitUpdate: false });
           className={clsx(
             "rounded px-2 py-0.5 italic",
             editor.isActive("italic")
-              ? "bg-gray-800 text-white"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-700 hover:bg-neutral-100"
           )}
         >
           I
@@ -91,8 +97,8 @@ editor.commands.setContent(value, { emitUpdate: false });
           className={clsx(
             "rounded px-2 py-0.5",
             editor.isActive("bulletList")
-              ? "bg-gray-800 text-white"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-700 hover:bg-neutral-100"
           )}
         >
           • List
@@ -105,8 +111,8 @@ editor.commands.setContent(value, { emitUpdate: false });
           className={clsx(
             "rounded px-2 py-0.5",
             editor.isActive("heading", { level: 2 })
-              ? "bg-gray-800 text-white"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-700 hover:bg-neutral-100"
           )}
         >
           H2
@@ -119,15 +125,16 @@ editor.commands.setContent(value, { emitUpdate: false });
           className={clsx(
             "rounded px-2 py-0.5",
             editor.isActive("heading", { level: 3 })
-              ? "bg-gray-800 text-white"
-              : "text-gray-700 hover:bg-gray-100"
+              ? "bg-neutral-900 text-white"
+              : "text-neutral-700 hover:bg-neutral-100"
           )}
         >
           H3
         </button>
       </div>
 
-      <div className="min-h-[280px] cursor-text">
+      {/* Editor body */}
+      <div className="min-h-[320px] cursor-text">
         <EditorContent editor={editor} />
       </div>
     </div>
