@@ -13,7 +13,8 @@ export default function NotionStyleEditor() {
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
-  
+  const toolbarRef = useRef<HTMLDivElement>(null);
+
   // AI Copilot state
   const [showCopilot, setShowCopilot] = useState(false);
   const [copilotInput, setCopilotInput] = useState("");
@@ -22,8 +23,16 @@ export default function NotionStyleEditor() {
 
   // Formatting state
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
+
+   // Selection toolbar state
+  const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
+  const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [savedRange, setSavedRange] = useState<Range | null>(null);
+
+  // Image modal state
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
@@ -34,7 +43,63 @@ export default function NotionStyleEditor() {
       editorRef.current.innerHTML = '<p><br></p>';
     }
   }, []);
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      // Don't hide toolbar if we're showing the link input
+      if (showLinkInput) return;
 
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        setShowSelectionToolbar(false);
+        return;
+      }
+
+      const selectedText = selection.toString().trim();
+      if (!selectedText) {
+        setShowSelectionToolbar(false);
+        return;
+      }
+
+      // Check if selection is within our editor
+      const range = selection.getRangeAt(0);
+      if (!editorRef.current?.contains(range.commonAncestorContainer)) {
+        setShowSelectionToolbar(false);
+        return;
+      }
+
+      // Get position of selection
+      const rect = range.getBoundingClientRect();
+      setToolbarPosition({
+        top: rect.top - 50 + window.scrollY,
+        left: rect.left + rect.width / 2,
+      });
+      
+      setSavedRange(range.cloneRange());
+      setShowSelectionToolbar(true);
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, [showLinkInput]);
+    // Click outside to close link input
+  useEffect(() => {
+    if (!showLinkInput) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (toolbarRef.current && !toolbarRef.current.contains(target) && !editorRef.current?.contains(target)) {
+        setShowLinkInput(false);
+        setShowSelectionToolbar(false);
+        setLinkUrl("");
+      }
+    };
+
+    // Use a small delay to allow the button click to register first
+    setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
+
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLinkInput]);
   const handleSave = async () => {
     setSaving(true);
     const htmlContent = editorRef.current?.innerHTML || "";
@@ -42,14 +107,38 @@ export default function NotionStyleEditor() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     setSaving(false);
   };
+  // Handle Ctrl+Click on links in the editor
+  useEffect(() => {
+    const handleEditorClick = (e: MouseEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.target instanceof HTMLElement) {
+        const link = e.target.closest('a.editor-link');
+        if (link instanceof HTMLAnchorElement) {
+          e.preventDefault();
+          window.open(link.href, '_blank', 'noopener,noreferrer');
+        }
+      }
+    };
 
+    const editor = editorRef.current;
+    if (editor) {
+      editor.addEventListener('click', handleEditorClick);
+      return () => editor.removeEventListener('click', handleEditorClick);
+    }
+  }, []);
   const execCommand = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
     editorRef.current?.focus();
   };
 
-  const formatBold = () => execCommand('bold');
-  const formatItalic = () => execCommand('italic');
+  const formatBold = () => {
+    execCommand('bold');
+    setShowSelectionToolbar(false);
+  };
+  
+  const formatItalic = () => {
+    execCommand('italic');
+    setShowSelectionToolbar(false);
+  };
   const formatCode = () => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -84,14 +173,43 @@ export default function NotionStyleEditor() {
 
   const formatList = () => execCommand('insertUnorderedList');
 
-  const insertLink = () => {
-    if (!linkUrl) return;
-    const text = linkText || linkUrl;
-    const html = `<a href="${linkUrl}" class="editor-link" target="_blank" rel="noopener noreferrer">${text}</a>`;
-    execCommand('insertHTML', html);
-    setShowLinkModal(false);
+  const openLinkInput = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Save the current selection
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      setSavedRange(selection.getRangeAt(0).cloneRange());
+    }
+    
+    setShowLinkInput(true);
     setLinkUrl("");
-    setLinkText("");
+  };
+
+  const insertLink = () => {
+    if (!linkUrl || !savedRange) return;
+
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(savedRange);
+    }
+
+    const selectedText = savedRange.toString();
+    // Ensure URL has a protocol
+    let finalUrl = linkUrl;
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+    
+    const html = `<a href="${finalUrl}" class="editor-link" target="_blank" rel="noopener noreferrer">${selectedText}</a>`;
+    execCommand('insertHTML', html);
+    
+    setShowLinkInput(false);
+    setShowSelectionToolbar(false);
+    setLinkUrl("");
+    setSavedRange(null);
   };
 
 const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -480,7 +598,75 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
           </div>
         )}
       </div>
-
+      {/* Floating Selection Toolbar */}
+      {showSelectionToolbar && (
+        <div
+        ref={toolbarRef}
+          className="fixed z-50 flex items-center gap-1 rounded-lg border border-neutral-300 bg-white p-1 shadow-xl"
+          style={{
+            top: `${toolbarPosition.top}px`,
+            left: `${toolbarPosition.left}px`,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {!showLinkInput ? (
+            <>
+              <button
+                onClick={formatBold}
+                onMouseDown={(e) => e.preventDefault()}
+                className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+                title="Bold"
+              >
+                <Bold className="h-4 w-4" />
+              </button>
+              <button
+                onClick={formatItalic}
+                onMouseDown={(e) => e.preventDefault()}
+                className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+                title="Italic"
+              >
+                <Italic className="h-4 w-4" />
+              </button>
+              <div className="h-6 w-px bg-neutral-200" />
+              <button
+                onClick={openLinkInput}
+                onMouseDown={(e) => e.preventDefault()}
+                className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+                title="Add Link"
+              >
+                <Link className="h-4 w-4" />
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 px-2">
+              <input
+                type="url"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    insertLink();
+                  } else if (e.key === 'Escape') {
+                    setShowLinkInput(false);
+                    setShowSelectionToolbar(false);
+                  }
+                }}
+                placeholder="Paste link..."
+                className="w-64 rounded border border-neutral-300 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-200"
+                autoFocus
+              />
+              <button
+                onClick={insertLink}
+                disabled={!linkUrl}
+                className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                Apply
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {/* Link Modal */}
       {showLinkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
