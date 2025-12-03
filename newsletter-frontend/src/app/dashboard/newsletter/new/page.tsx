@@ -33,10 +33,16 @@ export default function NotionStyleEditor() {
   const [savedRange, setSavedRange] = useState<Range | null>(null);
 
   // Image modal state
-  const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Resizable image state
+  const [resizingImage, setResizingImage] = useState<HTMLImageElement | null>(null);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0 });
   useEffect(() => {
     // Initialize with a paragraph if empty
     if (editorRef.current && !editorRef.current.innerHTML) {
@@ -211,7 +217,124 @@ export default function NotionStyleEditor() {
     setLinkUrl("");
     setSavedRange(null);
   };
+const handleImageUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
 
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setImagePreview(result);
+      setImageFile(file);
+    };
+    reader.readAsDataURL(file);
+  };
+
+const insertImage = () => {
+  if (!imagePreview || !editorRef.current) return;
+
+  const editor = editorRef.current;
+
+  // Create wrapper + img
+  const wrapper = document.createElement("div");
+  wrapper.className = "image-wrapper";
+  wrapper.style.margin = "1em 0";
+  wrapper.style.textAlign = "center";
+
+  const img = document.createElement("img");
+  img.src = imagePreview;
+  img.className = "editor-image";
+  img.style.maxWidth = "100%";
+  img.style.height = "auto";
+  img.style.cursor = "pointer";
+  img.style.borderRadius = "8px";
+
+  wrapper.appendChild(img);
+
+  // Click to start resizing
+  wrapper.addEventListener("click", (e) => {
+    e.stopPropagation();
+    startImageResize(img);
+  });
+
+  const selection = window.getSelection();
+  let range: Range | null = null;
+
+  // 1. Use saved range from when modal was opened (best)
+  if (savedImageRange) {
+    range = savedImageRange;
+  }
+  // 2. Or current selection if it's inside the editor
+  else if (
+    selection &&
+    selection.rangeCount > 0 &&
+    editor.contains(selection.anchorNode)
+  ) {
+    range = selection.getRangeAt(0);
+  }
+  // 3. Fallback: append at end of editor
+  else {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+  }
+
+  if (!range) return;
+
+  // 🔹 Find the block element (p/div/li) for the caret
+  let node: Node | null = range.startContainer;
+  let block: HTMLElement | null = null;
+
+  while (node && node !== editor) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = (node as HTMLElement).tagName.toLowerCase();
+      if (tag === "p" || tag === "div" || tag === "li") {
+        block = node as HTMLElement;
+        break;
+      }
+    }
+    node = node.parentNode;
+  }
+
+  // Decide where to insert the image wrapper
+  if (block && block.parentNode) {
+    // Insert AFTER the current block, as its own block
+    block.parentNode.insertBefore(wrapper, block.nextSibling);
+  } else {
+    // Fallback: append to editor
+    editor.appendChild(wrapper);
+  }
+
+  // Always add a paragraph after the image so the user can continue typing
+  const p = document.createElement("p");
+  p.innerHTML = "<br>";
+  wrapper.parentNode?.insertBefore(p, wrapper.nextSibling);
+
+  // Move caret into that new paragraph
+  const newRange = document.createRange();
+  newRange.setStart(p, 0);
+  newRange.collapse(true);
+
+  selection?.removeAllRanges();
+  selection?.addRange(newRange);
+
+  // Clean up modal state
+  setShowImageModal(false);
+  setImagePreview("");
+  setImageFile(null);
+  setSavedImageRange(null);
+
+  editor.focus();
+};
+
+
+
+  const startImageResize = (img: HTMLImageElement) => {
+    setResizingImage(img);
+    img.style.border = '2px solid #7c3aed';
+  };
 const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
   // Bold / italic shortcuts first
               if (e.ctrlKey || e.metaKey) {
@@ -291,16 +414,6 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
 };
 
 
-
-  const insertImage = () => {
-    if (!imageUrl) return;
-    const html = `<img src="${imageUrl}" alt="${imageAlt || 'image'}" class="editor-image" />`;
-    execCommand('insertHTML', html);
-    setShowImageModal(false);
-    setImageUrl("");
-    setImageAlt("");
-  };
-
   const sendToCopilot = async () => {
     const prompt = copilotInput.trim();
     if (!prompt) return;
@@ -340,6 +453,20 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (lastAssistant) {
       setCopilotMessages(prev => prev.filter(m => m.id !== lastAssistant.id));
     }
+  };
+  const [savedImageRange, setSavedImageRange] = useState<Range | null>(null);
+  const openImageModal = () => {
+  const selection = window.getSelection();
+  if (
+    selection &&
+    selection.rangeCount > 0 &&
+    editorRef.current?.contains(selection.anchorNode)
+  ) {
+    setSavedImageRange(selection.getRangeAt(0).cloneRange());
+  } else {
+    setSavedImageRange(null);
+  }
+  setShowImageModal(true);
   };
 
   return (
@@ -409,6 +536,16 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
           margin: 1em 0;
           display: block;
         }
+         .image-resize-handle {
+          position: absolute;
+          width: 12px;
+          height: 12px;
+          background: #7c3aed;
+          border: 2px solid white;
+          border-radius: 50%;
+          cursor: nwse-resize;
+          z-index: 10;
+        }
       `}</style>
 
       {/* Top bar */}
@@ -453,20 +590,20 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
 
         {/* Formatting Toolbar */}
         <div className="sticky top-20 z-40 mt-6 flex items-center gap-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-sm">
-          <button
+          {/* <button
             onClick={formatBold}
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
             title="Bold (Ctrl+B)"
           >
             <Bold className="h-4 w-4" />
-          </button>
-          <button
+          </button> */}
+          {/* <button
             onClick={formatItalic}
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
             title="Italic (Ctrl+I)"
           >
             <Italic className="h-4 w-4" />
-          </button>
+          </button> */}
           <button
             onClick={formatList}
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
@@ -482,15 +619,15 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
             <Code className="h-4 w-4" />
           </button>
           <div className="h-6 w-px bg-neutral-200" />
-          <button
+          {/* <button
             onClick={() => setShowLinkModal(true)}
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
             title="Insert Link"
           >
             <Link className="h-4 w-4" />
-          </button>
+          </button> */}
           <button
-            onClick={() => setShowImageModal(true)}
+            onClick={openImageModal}
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
             title="Insert Image"
           >
@@ -719,39 +856,70 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       )}
 
       {/* Image Modal */}
+            {/* Image Modal */}
+{/* Image Modal */}
       {showImageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
             <h3 className="mb-4 text-lg font-semibold text-neutral-900">Insert Image</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-neutral-700">Image URL</label>
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://example.com/image.jpg"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  autoFocus
-                />
+            
+            <div className="space-y-4">
+              {/* File upload area */}
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleImageUpload(file);
+                }}
+                className="cursor-pointer rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 p-8 text-center transition-colors hover:border-purple-400 hover:bg-purple-50"
+              >
+                <Image className="mx-auto h-12 w-12 text-neutral-400" />
+                <p className="mt-2 text-sm font-medium text-neutral-700">
+                  Click to upload or drag and drop
+                </p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  PNG, JPG, GIF up to 10MB
+                </p>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-neutral-700">Alt Text (optional)</label>
-                <input
-                  type="text"
-                  value={imageAlt}
-                  onChange={(e) => setImageAlt(e.target.value)}
-                  placeholder="Description of image"
-                  className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                />
-              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                }}
+                className="hidden"
+              />
+
+              {/* Image preview */}
+              {imagePreview && (
+                <div className="rounded-lg border border-neutral-200 p-4">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="mx-auto max-h-48 rounded"
+                  />
+                  <p className="mt-2 text-center text-xs text-neutral-600">
+                    {imageFile?.name}
+                  </p>
+                </div>
+              )}
             </div>
+
             <div className="mt-6 flex justify-end gap-2">
               <button
                 onClick={() => {
                   setShowImageModal(false);
-                  setImageUrl("");
-                  setImageAlt("");
+                  setImagePreview("");
+                  setImageFile(null);
                 }}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
               >
@@ -759,12 +927,63 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
               </button>
               <button
                 onClick={insertImage}
-                disabled={!imageUrl}
+                disabled={!imagePreview}
                 className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
               >
-                Insert
+                Insert Image
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image resize overlay */}
+      {resizingImage && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => {
+            if (resizingImage) {
+              resizingImage.style.border = '';
+              setResizingImage(null);
+            }
+          }}
+        >
+          <div
+            className="absolute bg-white rounded-lg border border-neutral-300 shadow-lg p-3 flex items-center gap-3"
+            style={{
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <label className="text-sm font-medium text-neutral-700">Width:</label>
+            <input
+              type="range"
+              min="200"
+              max="1000"
+              step="10"
+              defaultValue={resizingImage.width || 600}
+              onChange={(e) => {
+                if (resizingImage) {
+                  resizingImage.style.width = e.target.value + 'px';
+                  resizingImage.style.maxWidth = 'none';
+                }
+              }}
+              className="w-48"
+            />
+            <button
+              onClick={() => {
+                if (resizingImage) {
+                  // keep the width the slider set
+                  resizingImage.style.border = '';
+                  setResizingImage(null);
+                }
+              }}
+              className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
