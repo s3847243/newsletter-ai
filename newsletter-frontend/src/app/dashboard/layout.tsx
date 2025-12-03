@@ -23,15 +23,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-      <aside className="w-64 bg-white border-r flex flex-col">
+    <div className="h-screen flex bg-gray-100 overflow-hidden">
+      <aside className="w-64 bg-white border-r flex flex-col ">
         <div className="p-4 border-b">
           <h1 className="font-semibold text-lg">Newsletter AI</h1>
           <p className="text-xs text-gray-500">
             {user?.email}
           </p>
         </div>
-        <nav className="flex-1 p-4 space-y-2 text-sm">
+        <nav className="flex-1 p-4 space-y-2 text-sm overflow-y-auto">
           <a href="/dashboard" className="block px-2 py-1 rounded hover:bg-gray-100">
             My issues
           </a>
@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           Log out
         </button>
       </aside>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }
