@@ -2,11 +2,32 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, Check, X, Loader2, Bold, Italic, List, Code, Link, Image } from "lucide-react";
-
+import { apiFetch } from "@/lib/apiClient";
+import { useAuth } from "@/context/AuthContext";
 type CopilotMessage = {
   role: "user" | "assistant";
   content: string;
   id: string;
+};
+type CopilotApiMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type CopilotContext = {
+  title?: string;
+  audience?: string;
+  tone?: string;
+  currentContent?: string;
+};
+
+type CopilotRequest = {
+  context?: CopilotContext;
+  messages: CopilotApiMessage[];
+};
+
+type CopilotResponse = {
+  reply: string;
 };
 
 export default function NotionStyleEditor() {
@@ -14,7 +35,7 @@ export default function NotionStyleEditor() {
   const [saving, setSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-
+  const { accessToken } = useAuth();
   // AI Copilot state
   const [showCopilot, setShowCopilot] = useState(false);
   const [copilotInput, setCopilotInput] = useState("");
@@ -39,8 +60,6 @@ export default function NotionStyleEditor() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Resizable image state
   const [resizingImage, setResizingImage] = useState<HTMLImageElement | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0 });
   useEffect(() => {
@@ -217,7 +236,7 @@ export default function NotionStyleEditor() {
     setLinkUrl("");
     setSavedRange(null);
   };
-const handleImageUpload = (file: File) => {
+  const handleImageUpload = (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
       return;
@@ -232,221 +251,267 @@ const handleImageUpload = (file: File) => {
     reader.readAsDataURL(file);
   };
 
-const insertImage = () => {
-  if (!imagePreview || !editorRef.current) return;
+  const insertImage = () => {
+    if (!imagePreview || !editorRef.current) return;
 
-  const editor = editorRef.current;
+    const editor = editorRef.current;
 
-  // Create wrapper + img
-  const wrapper = document.createElement("div");
-  wrapper.className = "image-wrapper";
-  wrapper.style.margin = "1em 0";
-  wrapper.style.textAlign = "center";
+    // Create wrapper + img
+    const wrapper = document.createElement("div");
+    wrapper.className = "image-wrapper";
+    wrapper.style.margin = "1em 0";
+    wrapper.style.textAlign = "center";
 
-  const img = document.createElement("img");
-  img.src = imagePreview;
-  img.className = "editor-image";
-  img.style.maxWidth = "100%";
-  img.style.height = "auto";
-  img.style.cursor = "pointer";
-  img.style.borderRadius = "8px";
+    const img = document.createElement("img");
+    img.src = imagePreview;
+    img.className = "editor-image";
+    img.style.maxWidth = "100%";
+    img.style.height = "auto";
+    img.style.cursor = "pointer";
+    img.style.borderRadius = "8px";
 
-  wrapper.appendChild(img);
+    wrapper.appendChild(img);
 
-  // Click to start resizing
-  wrapper.addEventListener("click", (e) => {
-    e.stopPropagation();
-    startImageResize(img);
-  });
+    // Click to start resizing
+    wrapper.addEventListener("click", (e) => {
+      e.stopPropagation();
+      startImageResize(img);
+    });
 
-  const selection = window.getSelection();
-  let range: Range | null = null;
+    const selection = window.getSelection();
+    let range: Range | null = null;
 
-  // 1. Use saved range from when modal was opened (best)
-  if (savedImageRange) {
-    range = savedImageRange;
-  }
-  // 2. Or current selection if it's inside the editor
-  else if (
-    selection &&
-    selection.rangeCount > 0 &&
-    editor.contains(selection.anchorNode)
-  ) {
-    range = selection.getRangeAt(0);
-  }
-  // 3. Fallback: append at end of editor
-  else {
-    range = document.createRange();
-    range.selectNodeContents(editor);
-    range.collapse(false);
-  }
-
-  if (!range) return;
-
-  // 🔹 Find the block element (p/div/li) for the caret
-  let node: Node | null = range.startContainer;
-  let block: HTMLElement | null = null;
-
-  while (node && node !== editor) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const tag = (node as HTMLElement).tagName.toLowerCase();
-      if (tag === "p" || tag === "div" || tag === "li") {
-        block = node as HTMLElement;
-        break;
-      }
+    // 1. Use saved range from when modal was opened (best)
+    if (savedImageRange) {
+      range = savedImageRange;
     }
-    node = node.parentNode;
-  }
+    // 2. Or current selection if it's inside the editor
+    else if (
+      selection &&
+      selection.rangeCount > 0 &&
+      editor.contains(selection.anchorNode)
+    ) {
+      range = selection.getRangeAt(0);
+    }
+    // 3. Fallback: append at end of editor
+    else {
+      range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+    }
 
-  // Decide where to insert the image wrapper
-  if (block && block.parentNode) {
-    // Insert AFTER the current block, as its own block
-    block.parentNode.insertBefore(wrapper, block.nextSibling);
-  } else {
-    // Fallback: append to editor
-    editor.appendChild(wrapper);
-  }
+    if (!range) return;
 
-  // Always add a paragraph after the image so the user can continue typing
-  const p = document.createElement("p");
-  p.innerHTML = "<br>";
-  wrapper.parentNode?.insertBefore(p, wrapper.nextSibling);
+    // 🔹 Find the block element (p/div/li) for the caret
+    let node: Node | null = range.startContainer;
+    let block: HTMLElement | null = null;
 
-  // Move caret into that new paragraph
-  const newRange = document.createRange();
-  newRange.setStart(p, 0);
-  newRange.collapse(true);
+    while (node && node !== editor) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = (node as HTMLElement).tagName.toLowerCase();
+        if (tag === "p" || tag === "div" || tag === "li") {
+          block = node as HTMLElement;
+          break;
+        }
+      }
+      node = node.parentNode;
+    }
 
-  selection?.removeAllRanges();
-  selection?.addRange(newRange);
+    // Decide where to insert the image wrapper
+    if (block && block.parentNode) {
+      // Insert AFTER the current block, as its own block
+      block.parentNode.insertBefore(wrapper, block.nextSibling);
+    } else {
+      // Fallback: append to editor
+      editor.appendChild(wrapper);
+    }
 
-  // Clean up modal state
-  setShowImageModal(false);
-  setImagePreview("");
-  setImageFile(null);
-  setSavedImageRange(null);
+    // Always add a paragraph after the image so the user can continue typing
+    const p = document.createElement("p");
+    p.innerHTML = "<br>";
+    wrapper.parentNode?.insertBefore(p, wrapper.nextSibling);
 
-  editor.focus();
-};
+    // Move caret into that new paragraph
+    const newRange = document.createRange();
+    newRange.setStart(p, 0);
+    newRange.collapse(true);
 
+    selection?.removeAllRanges();
+    selection?.addRange(newRange);
 
+    // Clean up modal state
+    setShowImageModal(false);
+    setImagePreview("");
+    setImageFile(null);
+    setSavedImageRange(null);
 
+    editor.focus();
+  };
   const startImageResize = (img: HTMLImageElement) => {
     setResizingImage(img);
     img.style.border = '2px solid #7c3aed';
   };
-const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-  // Bold / italic shortcuts first
-              if (e.ctrlKey || e.metaKey) {
-              if (e.key === 'b') {
-                e.preventDefault();
-                formatBold();
-                return;
-              } else if (e.key === 'i') {
-                e.preventDefault();
-                formatItalic();
-                return;
-              }
-            }
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Bold / italic shortcuts first
+    if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'b') {
+      e.preventDefault();
+      formatBold();
+      return;
+    } else if (e.key === 'i') {
+      e.preventDefault();
+      formatItalic();
+      return;
+    }
+    }
 
-            if (e.key !== "Enter") return;
+    if (e.key !== "Enter") return;
 
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) return;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
 
-            const range = selection.getRangeAt(0);
+    const range = selection.getRangeAt(0);
 
-            // Find the parent block element (p, div, or li)
-            let node: Node | null = range.startContainer;
-            let currentLine: HTMLElement | null = null;
+    // Find the parent block element (p, div, or li)
+    let node: Node | null = range.startContainer;
+    let currentLine: HTMLElement | null = null;
 
-            while (node && node !== editorRef.current) {
-              if (node.nodeType === Node.ELEMENT_NODE) {
-                const tag = (node as HTMLElement).tagName.toLowerCase();
-                if (tag === "p" || tag === "div" || tag === "li") {
-                  currentLine = node as HTMLElement;
-                  break;
-                }
-              }
-              node = node.parentNode;
-            }
+    while (node && node !== editorRef.current) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = (node as HTMLElement).tagName.toLowerCase();
+      if (tag === "p" || tag === "div" || tag === "li") {
+        currentLine = node as HTMLElement;
+        break;
+      }
+    }
+    node = node.parentNode;
+    }
 
-            if (!currentLine) return;
+    if (!currentLine) return;
 
-            // Get the FULL text content of the line (ignore formatting)
-            const lineText = (currentLine.textContent || "").trim();
-            
-            console.log("Line text:", lineText);
-            
-            // Check if line starts with "number. "
-            const match = lineText.match(/^(\d+)\.\s*/);
-            if (!match) {
-              return; // Not a numbered list
-            }
+    // Get the FULL text content of the line (ignore formatting)
+    const lineText = (currentLine.textContent || "").trim();
 
-            e.preventDefault();
+    console.log("Line text:", lineText);
 
-            const currentNumber = parseInt(match[1], 10);
-            const nextNumber = currentNumber + 1;
+    // Check if line starts with "number. "
+    const match = lineText.match(/^(\d+)\.\s*/);
+    if (!match) {
+    return; // Not a numbered list
+    }
 
-            console.log("Current number:", currentNumber, "Next:", nextNumber);
+    e.preventDefault();
 
-            // Create new paragraph with the next number
-            const newLine = document.createElement("p");
-            newLine.innerHTML = `${nextNumber}. `;
+    const currentNumber = parseInt(match[1], 10);
+    const nextNumber = currentNumber + 1;
 
-            // Insert after current line
-            if (currentLine.nextSibling) {
-              currentLine.parentNode?.insertBefore(newLine, currentLine.nextSibling);
-            } else {
-              currentLine.parentNode?.appendChild(newLine);
-            }
+    console.log("Current number:", currentNumber, "Next:", nextNumber);
 
-            // Set cursor at the end of the new line
-            const newRange = document.createRange();
-            newRange.selectNodeContents(newLine);
-            newRange.collapse(false);
+    // Create new paragraph with the next number
+    const newLine = document.createElement("p");
+    newLine.innerHTML = `${nextNumber}. `;
 
-            selection.removeAllRanges();
-            selection.addRange(newRange);
-            
-            console.log("Created new line with:", newLine.textContent);
-};
+    // Insert after current line
+    if (currentLine.nextSibling) {
+    currentLine.parentNode?.insertBefore(newLine, currentLine.nextSibling);
+    } else {
+    currentLine.parentNode?.appendChild(newLine);
+    }
 
+    // Set cursor at the end of the new line
+    const newRange = document.createRange();
+    newRange.selectNodeContents(newLine);
+    newRange.collapse(false);
 
-  const sendToCopilot = async () => {
-    const prompt = copilotInput.trim();
-    if (!prompt) return;
+    selection.removeAllRanges();
+    selection.addRange(newRange);
 
-    const userMsg: CopilotMessage = {
-      role: "user",
-      content: prompt,
-      id: Date.now().toString(),
+  console.log("Created new line with:", newLine.textContent);
+  };
+const sendToCopilot = async () => {
+  const prompt = copilotInput.trim();
+  if (!prompt || copilotLoading) return;
+
+  // 1. Build the new user message
+  const userMsg: CopilotMessage = {
+    role: "user",
+    content: prompt,
+    id: Date.now().toString(),
+  };
+
+  // 2. Update local state immediately for snappy UI
+  const newMessages: CopilotMessage[] = [...copilotMessages, userMsg];
+  setCopilotMessages(newMessages);
+  setCopilotInput("");
+  setCopilotLoading(true);
+
+  try {
+    // 3. Build context from editor
+    const currentContent =
+      editorRef.current?.innerHTML && editorRef.current.innerHTML !== "<p><br></p>"
+        ? editorRef.current.innerHTML
+        : undefined;
+
+    const body: CopilotRequest = {
+      context: {
+        title: title || undefined,
+        // you can feed these later if you have them:
+        // audience: ...,
+        // tone: ...,
+        currentContent,
+      },
+      messages: newMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      })),
     };
 
-    setCopilotMessages(prev => [...prev, userMsg]);
-    setCopilotInput("");
-    setCopilotLoading(true);
+    // 4. Call your backend
+    const res = await apiFetch<CopilotResponse>(
+      "/ai/copilot",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      accessToken
+    );
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    // 5. Append assistant reply
     const aiMsg: CopilotMessage = {
       role: "assistant",
-      content: `Here's a draft based on your request: "${prompt}"\n\nConsistent writing beats motivation every time. While motivation is fleeting and unpredictable, showing up daily—even when uninspired—builds momentum and skill. The writer who produces imperfect work regularly will always outpace the one waiting for the perfect mood.`,
+      content: res.reply,
       id: (Date.now() + 1).toString(),
     };
 
-    setCopilotMessages(prev => [...prev, aiMsg]);
+    setCopilotMessages((prev) => [...prev, aiMsg]);
+  } catch (err) {
+    console.error("Copilot error", err);
+    // Optional: show a toast or inline error message
+  } finally {
     setCopilotLoading(false);
-  };
+  }
+};
 
-  const acceptSuggestion = (message: CopilotMessage) => {
-    if (!editorRef.current) return;
-    const formattedContent = message.content.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
-    editorRef.current.innerHTML += formattedContent;
-    setCopilotMessages([]);
-    setShowCopilot(false);
-  };
+
+const acceptSuggestion = (message: CopilotMessage) => {
+  if (!editorRef.current) return;
+
+  const editor = editorRef.current;
+
+  // Turn plain text into simple paragraphs
+  const html = message.content
+    .split("\n")
+    .map((line) => `<p>${line || "<br>"}</p>`)
+    .join("");
+
+  // Append at the end for now
+  editor.insertAdjacentHTML("beforeend", html);
+
+  // Optionally: scroll editor to bottom
+  editor.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "end" });
+  setCopilotMessages([])
+};
+
 
   const rejectSuggestion = () => {
     const lastAssistant = [...copilotMessages].reverse().find(m => m.role === "assistant");
@@ -456,17 +521,17 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
   };
   const [savedImageRange, setSavedImageRange] = useState<Range | null>(null);
   const openImageModal = () => {
-  const selection = window.getSelection();
-  if (
-    selection &&
-    selection.rangeCount > 0 &&
-    editorRef.current?.contains(selection.anchorNode)
-  ) {
-    setSavedImageRange(selection.getRangeAt(0).cloneRange());
-  } else {
-    setSavedImageRange(null);
-  }
-  setShowImageModal(true);
+    const selection = window.getSelection();
+    if (
+      selection &&
+      selection.rangeCount > 0 &&
+      editorRef.current?.contains(selection.anchorNode)
+    ) {
+      setSavedImageRange(selection.getRangeAt(0).cloneRange());
+    } else {
+      setSavedImageRange(null);
+    }
+    setShowImageModal(true);
   };
 
   return (
@@ -479,7 +544,7 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
               onClick={() => setShowCopilot(!showCopilot)}
               className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 showCopilot
-                  ? "bg-purple-100 text-purple-700"
+                  ? "bg-purple-100 text-blue-700"
                   : "text-neutral-600 hover:bg-neutral-100"
               }`}
             >
@@ -499,10 +564,7 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
           </button>
         </div>
       </div>
-
-      {/* Main editor area */}
       <div className="mx-auto max-w-4xl px-8 pt-24 pb-32">
-        {/* Title */}
         <input
           type="text"
           value={title}
@@ -510,23 +572,7 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
           placeholder="Untitled"
           className="w-full border-none bg-transparent text-5xl font-bold text-neutral-900 placeholder:text-neutral-300 focus:outline-none"
         />
-
-        {/* Formatting Toolbar */}
         <div className="sticky top-20 z-40 mt-6 flex items-center gap-1 rounded-lg border border-neutral-200 bg-white p-1 shadow-sm">
-          {/* <button
-            onClick={formatBold}
-            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-            title="Bold (Ctrl+B)"
-          >
-            <Bold className="h-4 w-4" />
-          </button> */}
-          {/* <button
-            onClick={formatItalic}
-            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-            title="Italic (Ctrl+I)"
-          >
-            <Italic className="h-4 w-4" />
-          </button> */}
           <button
             onClick={formatList}
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
@@ -572,13 +618,27 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
 
         {/* AI Copilot Panel */}
         {showCopilot && (
-          <div className="mt-8 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 p-6 shadow-lg">
+          <div className="
+      fixed
+      bottom-6
+      right-6
+      z-50
+      w-96
+      max-h-[70vh]
+      rounded-xl
+      border-2 border-purple-200
+      bg-gradient-to-br from-purple-50 to-blue-50
+      p-6
+      shadow-2xl
+      flex
+      flex-col
+    ">
             <div className="mb-4 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-purple-600" />
               <h3 className="text-lg font-semibold text-neutral-900">AI Writing Assistant</h3>
             </div>
 
-            <div className="mb-4 max-h-80 space-y-3 overflow-y-auto">
+            <div className="mb-4 flex-1 space-y-3 overflow-y-auto">
               {copilotMessages.length === 0 && (
                 <p className="text-sm text-neutral-500">
                   Ask me to help you write something. For example: "Write an opening paragraph about the importance of consistent writing"
@@ -777,10 +837,6 @@ const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
           </div>
         </div>
       )}
-
-      {/* Image Modal */}
-            {/* Image Modal */}
-{/* Image Modal */}
       {showImageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">

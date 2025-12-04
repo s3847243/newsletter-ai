@@ -163,20 +163,27 @@ export const copilotChat = async (
 
     const ctx = input.context || {};
 
-    const systemParts = [
-      "You are an AI newsletter copilot embedded inside a writing app.",
-      "You help with structure, clarity, tone, hooks, CTAs, and editing.",
-      "You can propose improvements or new sections, but avoid rewriting entire newsletters unless asked.",
-      ctx.title ? `Current newsletter title: ${ctx.title}` : "",
-      ctx.audience ? `Target audience: ${ctx.audience}` : "",
-      ctx.tone ? `Preferred tone: ${ctx.tone}` : "",
-      ctx.currentContent
-        ? "The user has existing content; you can reference it, but do not just repeat it."
-        : "",
-      "Keep responses practical and concise. Where relevant, suggest concrete wording, not just abstract advice.",
-    ].filter(Boolean);
+const systemParts = [
+  "You are an AI newsletter copilot embedded inside a writing app.",
+  "You help with structure, clarity, tone, hooks, CTAs, and editing.",
+  "You can propose improvements or new sections, but avoid rewriting entire newsletters unless asked.",
+  ctx.title ? `Current newsletter title: ${ctx.title}` : "",
+  ctx.audience ? `Target audience: ${ctx.audience}` : "",
+  ctx.tone ? `Preferred tone: ${ctx.tone}` : "",
+  ctx.currentContent
+    ? "The user has existing content; you can reference it, but do not just repeat it."
+    : "",
+  "Your response must be ONLY the newsletter content or suggestions the user can paste into their newsletter.",
+  "Do NOT include any explanations, meta commentary, or instructions.",
+  "Do NOT include lines like 'I can tailor this...', 'Want a ready-to-paste section...', 'Let me know...', or any offer to help further.",
+  "Do NOT refer to yourself (no 'I', 'me', 'as an AI', etc.) unless the user explicitly asks you to write in first person in the newsletter itself.",
+  "Do NOT ask the user questions like 'Do you want me to...?' or 'Want a ready-to-paste section...?' at the end.",
+  "End your response with the final sentence of the content itself, not with an extra offer or comment.",
+  "Keep responses practical and concise. Where relevant, suggest concrete wording, not abstract advice.",
+].filter(Boolean);
 
-    const systemPrompt = systemParts.join("\n");
+const systemPrompt = systemParts.join("\n");
+
 
     const messages = input.messages.map((m) => ({
       role: m.role,
