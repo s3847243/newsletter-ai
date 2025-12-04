@@ -62,6 +62,15 @@ export default function NotionStyleEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [resizingImage, setResizingImage] = useState<HTMLImageElement | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0 });
+  // Rewrite state
+  const [showRewritePanel, setShowRewritePanel] = useState(false);
+  const [rewriteMode, setRewriteMode] = useState<
+    "improve" | "shorten" | "friendlier" | "formal" | "fix-grammar"
+  >("improve");
+  const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [rewriteSuggestion, setRewriteSuggestion] = useState("");
+  const [rewriteRange, setRewriteRange] = useState<Range | null>(null);
+
   useEffect(() => {
     // Initialize with a paragraph if empty
     if (editorRef.current && !editorRef.current.innerHTML) {
@@ -71,7 +80,7 @@ export default function NotionStyleEditor() {
   useEffect(() => {
     const handleSelectionChange = () => {
       // Don't hide toolbar if we're showing the link input
-      if (showLinkInput) return;
+      if (showLinkInput || showRewritePanel) return;
 
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
@@ -104,7 +113,7 @@ export default function NotionStyleEditor() {
     };
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
-  }, [showLinkInput]);
+  }, [showLinkInput, showRewritePanel]);
     // Click outside to close link input
   useEffect(() => {
     if (!showLinkInput) return;
@@ -428,70 +437,166 @@ export default function NotionStyleEditor() {
 
   console.log("Created new line with:", newLine.textContent);
   };
-const sendToCopilot = async () => {
-  const prompt = copilotInput.trim();
-  if (!prompt || copilotLoading) return;
+  const sendToCopilot = async () => {
+    const prompt = copilotInput.trim();
+    if (!prompt || copilotLoading) return;
 
-  // 1. Build the new user message
-  const userMsg: CopilotMessage = {
-    role: "user",
-    content: prompt,
-    id: Date.now().toString(),
+    // 1. Build the new user message
+    const userMsg: CopilotMessage = {
+      role: "user",
+      content: prompt,
+      id: Date.now().toString(),
+    };
+
+    // 2. Update local state immediately for snappy UI
+    const newMessages: CopilotMessage[] = [...copilotMessages, userMsg];
+    setCopilotMessages(newMessages);
+    setCopilotInput("");
+    setCopilotLoading(true);
+
+    try {
+      // 3. Build context from editor
+      const currentContent =
+        editorRef.current?.innerHTML && editorRef.current.innerHTML !== "<p><br></p>"
+          ? editorRef.current.innerHTML
+          : undefined;
+
+      const body: CopilotRequest = {
+        context: {
+          title: title || undefined,
+          // you can feed these later if you have them:
+          // audience: ...,
+          // tone: ...,
+          currentContent,
+        },
+        messages: newMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      };
+
+      // 4. Call your backend
+      const res = await apiFetch<CopilotResponse>(
+        "/ai/copilot",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+        accessToken
+      );
+
+      // 5. Append assistant reply
+      const aiMsg: CopilotMessage = {
+        role: "assistant",
+        content: res.reply,
+        id: (Date.now() + 1).toString(),
+      };
+
+      setCopilotMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      console.error("Copilot error", err);
+      // Optional: show a toast or inline error message
+    } finally {
+      setCopilotLoading(false);
+    }
+  };
+  // Open rewrite panel for current selection
+  const openRewritePanel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString().trim();
+    if (!selectedText) return;
+
+    setRewriteRange(range.cloneRange());
+    setRewriteSuggestion("");
+    setRewriteMode("improve");
+    setShowRewritePanel(true);
   };
 
-  // 2. Update local state immediately for snappy UI
-  const newMessages: CopilotMessage[] = [...copilotMessages, userMsg];
-  setCopilotMessages(newMessages);
-  setCopilotInput("");
-  setCopilotLoading(true);
+  // Call backend /ai/rewrite with selected text + mode
+  const runRewrite = async () => {
+    if (!rewriteRange || rewriteLoading) return;
 
-  try {
-    // 3. Build context from editor
-    const currentContent =
-      editorRef.current?.innerHTML && editorRef.current.innerHTML !== "<p><br></p>"
-        ? editorRef.current.innerHTML
-        : undefined;
+    const selectedText = rewriteRange.toString().trim();
+    if (!selectedText) return;
 
-    const body: CopilotRequest = {
-      context: {
-        title: title || undefined,
-        // you can feed these later if you have them:
-        // audience: ...,
-        // tone: ...,
-        currentContent,
-      },
-      messages: newMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      })),
-    };
+    setRewriteLoading(true);
+    setRewriteSuggestion("");
 
-    // 4. Call your backend
-    const res = await apiFetch<CopilotResponse>(
-      "/ai/copilot",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-      accessToken
-    );
+    try {
+      const body = {
+        mode: rewriteMode,
+        text: selectedText,
+      };
 
-    // 5. Append assistant reply
-    const aiMsg: CopilotMessage = {
-      role: "assistant",
-      content: res.reply,
-      id: (Date.now() + 1).toString(),
-    };
+      const res = await apiFetch<{ rewritten: string }>(
+        "/ai/rewrite",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+        accessToken
+      );
 
-    setCopilotMessages((prev) => [...prev, aiMsg]);
-  } catch (err) {
-    console.error("Copilot error", err);
-    // Optional: show a toast or inline error message
-  } finally {
-    setCopilotLoading(false);
-  }
-};
+      setRewriteSuggestion(res.rewritten.trim());
+    } catch (err) {
+      console.error("Rewrite error", err);
+      // Optional: show toast or inline error
+    } finally {
+      setRewriteLoading(false);
+    }
+  };
 
+  // Accept rewrite: replace selection contents with suggestion
+  const acceptRewrite = () => {
+    if (!rewriteRange || !rewriteSuggestion || !editorRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    // Restore range
+    selection.removeAllRanges();
+    selection.addRange(rewriteRange);
+
+    // Replace selected content
+    rewriteRange.deleteContents();
+
+    const frag = document.createDocumentFragment();
+    const lines = rewriteSuggestion.split("\n");
+
+    lines.forEach((line, idx) => {
+      frag.appendChild(document.createTextNode(line));
+      if (idx < lines.length - 1) {
+        frag.appendChild(document.createElement("br"));
+      }
+    });
+
+    rewriteRange.insertNode(frag);
+
+    // Collapse cursor at end of inserted text
+    const newRange = document.createRange();
+    newRange.setStartAfter(rewriteRange.endContainer);
+    newRange.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+
+    // Cleanup state
+    setShowRewritePanel(false);
+    setRewriteSuggestion("");
+    setRewriteRange(null);
+  };
+
+  // Discard rewrite suggestion
+  const discardRewrite = () => {
+    setShowRewritePanel(false);
+    setRewriteSuggestion("");
+    setRewriteRange(null);
+  };
 
 const acceptSuggestion = (message: CopilotMessage) => {
   if (!editorRef.current) return;
@@ -719,74 +824,143 @@ const acceptSuggestion = (message: CopilotMessage) => {
         )}
       </div>
       {/* Floating Selection Toolbar */}
-      {showSelectionToolbar && (
-        <div
-        ref={toolbarRef}
-          className="fixed z-50 flex items-center gap-1 rounded-lg border border-neutral-300 bg-white p-1 shadow-xl"
-          style={{
-            top: `${toolbarPosition.top}px`,
-            left: `${toolbarPosition.left}px`,
-            transform: 'translateX(-50%)',
+{showSelectionToolbar && (
+  <div
+    ref={toolbarRef}
+    className="fixed z-50 flex items-center gap-1 rounded-lg border border-neutral-300 bg-white p-1 shadow-xl"
+    style={{
+      top: `${toolbarPosition.top}px`,
+      left: `${toolbarPosition.left}px`,
+      transform: "translateX(-50%)",
+    }}
+  >
+    {/* 1) Link input mode */}
+    {showLinkInput ? (
+      <div className="flex items-center gap-2 px-2">
+        <input
+          type="url"
+          value={linkUrl}
+          onChange={(e) => setLinkUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              insertLink();
+            } else if (e.key === "Escape") {
+              setShowLinkInput(false);
+              setShowSelectionToolbar(false);
+            }
           }}
+          placeholder="Paste link..."
+          className="w-64 rounded border border-neutral-300 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-200"
+          autoFocus
+        />
+        <button
+          onClick={insertLink}
+          disabled={!linkUrl}
+          className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
         >
-          {!showLinkInput ? (
-            <>
+          Apply
+        </button>
+      </div>
+    ) : showRewritePanel ? (
+      /* 2) Rewrite panel mode */
+      <div className="flex flex-col gap-2 px-2 py-1 max-w-md">
+        {/* Mode selector + rewrite button */}
+        <div className="flex items-center gap-2">
+          <select
+            value={rewriteMode}
+            onChange={(e) =>
+              setRewriteMode(e.target.value as typeof rewriteMode)
+            }
+            className="rounded border border-neutral-300 px-2 py-1 text-xs focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-200"
+          >
+            <option value="improve">Improve</option>
+            <option value="shorten">Shorten</option>
+            <option value="friendlier">Friendlier</option>
+            <option value="formal">More formal</option>
+            <option value="fix-grammar">Fix grammar</option>
+          </select>
+
+          <button
+            onClick={runRewrite}
+            disabled={rewriteLoading}
+            className="rounded bg-purple-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+          >
+            {rewriteLoading ? "Rewriting..." : "Rewrite"}
+          </button>
+
+          <button
+            onClick={discardRewrite}
+            className="rounded px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {/* Suggestion preview + accept/discard */}
+        {rewriteSuggestion && (
+          <div className="mt-1 rounded border border-neutral-200 bg-neutral-50 px-3 py-2">
+            <p className="max-h-40 overflow-y-auto text-xs whitespace-pre-wrap text-neutral-800">
+              {rewriteSuggestion}
+            </p>
+            <div className="mt-2 flex gap-2">
               <button
-                onClick={formatBold}
-                onMouseDown={(e) => e.preventDefault()}
-                className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
-                title="Bold"
+                onClick={acceptRewrite}
+                className="rounded bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700"
               >
-                <Bold className="h-4 w-4" />
+                Accept
               </button>
               <button
-                onClick={formatItalic}
-                onMouseDown={(e) => e.preventDefault()}
-                className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
-                title="Italic"
+                onClick={discardRewrite}
+                className="rounded bg-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-300"
               >
-                <Italic className="h-4 w-4" />
-              </button>
-              <div className="h-6 w-px bg-neutral-200" />
-              <button
-                onClick={openLinkInput}
-                onMouseDown={(e) => e.preventDefault()}
-                className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
-                title="Add Link"
-              >
-                <Link className="h-4 w-4" />
-              </button>
-            </>
-          ) : (
-            <div className="flex items-center gap-2 px-2">
-              <input
-                type="url"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    insertLink();
-                  } else if (e.key === 'Escape') {
-                    setShowLinkInput(false);
-                    setShowSelectionToolbar(false);
-                  }
-                }}
-                placeholder="Paste link..."
-                className="w-64 rounded border border-neutral-300 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-200"
-                autoFocus
-              />
-              <button
-                onClick={insertLink}
-                disabled={!linkUrl}
-                className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-              >
-                Apply
+                Discard
               </button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+    ) : (
+      /* 3) Normal toolbar mode */
+      <>
+        <button
+          onClick={formatBold}
+          onMouseDown={(e) => e.preventDefault()}
+          className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+          title="Bold"
+        >
+          <Bold className="h-4 w-4" />
+        </button>
+        <button
+          onClick={formatItalic}
+          onMouseDown={(e) => e.preventDefault()}
+          className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+          title="Italic"
+        >
+          <Italic className="h-4 w-4" />
+        </button>
+        <div className="h-6 w-px bg-neutral-200" />
+        <button
+          onClick={openLinkInput}
+          onMouseDown={(e) => e.preventDefault()}
+          className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+          title="Add Link"
+        >
+          <Link className="h-4 w-4" />
+        </button>
+        <button
+          onClick={openRewritePanel}
+          onMouseDown={(e) => e.preventDefault()}
+          className="rounded p-2 text-neutral-700 hover:bg-neutral-100"
+          title="Rewrite selection"
+        >
+          ✏️
+        </button>
+      </>
+    )}
+  </div>
+)}
+
       {/* Link Modal */}
       {showLinkModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
