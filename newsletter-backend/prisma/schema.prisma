@@ -44,6 +44,7 @@ model CreatorProfile {
   subscribers  Subscriber[]
   followers    Follow[]         @relation("CreatorFollows")
   aiSuggestions AiSuggestion[]
+  allowTraining Boolean @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 }
