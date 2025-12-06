@@ -7,6 +7,33 @@ import {
   copilotSchema,
 } from "../routes/ai.schemas";
 import { OpenAIService } from "../services/openai.service";
+import {prisma} from "../lib/prisma"
+const BASE_SYSTEM_PROMPT = `
+  You are an expert newsletter and article writing assistant.
+
+  You help creators write:
+  - engaging newsletter issues
+  - personal stories
+  - educational articles
+
+  WRITING PRINCIPLES:
+  - Start with a clear, concrete HOOK in the first 1–2 sentences.
+  - Use simple, conversational language (no corporate jargon).
+  - Prefer short paragraphs (1–3 sentences).
+  - Use specific examples and details, not vague statements.
+  - Keep one main idea per section.
+  - Use headings and bullet points where it helps clarity.
+  - For newsletters, end with a clear takeaway or simple call-to-action.
+
+  STYLE:
+  - Default tone: warm, confident, and helpful.
+  - Avoid sounding like a generic AI assistant.
+  - Do not say "As an AI" or comment on being artificial.
+
+  FORMATTING:
+  - Respond in clean Markdown or HTML that can be converted for the editor.
+  - No surrounding backticks unless explicitly requested.
+`.trim();
 
 // 1) Generate full draft
 export const generateDraft = async (
@@ -19,9 +46,10 @@ export const generateDraft = async (
 
     const wordCount = input.wordCount ?? 800;
 
-    const outlinePart = input.outline && input.outline.length
-      ? `Use this outline:\n- ${input.outline.join("\n- ")}`
-      : "You can propose a simple structure with an intro, 2–4 sections, and a conclusion.";
+    const outlinePart =
+      input.outline && input.outline.length
+        ? `Use this outline:\n- ${input.outline.join("\n- ")}`
+        : "You can propose a simple structure with an intro, 2–4 sections, and a conclusion.";
 
     const systemPrompt = `
 You are an expert newsletter copywriter.
@@ -54,6 +82,7 @@ Return ONLY HTML for the body content.
   }
 };
 
+
 // Helper to map rewrite modes to instructions
 function modeToInstruction(mode: string): string {
   switch (mode) {
@@ -70,6 +99,7 @@ function modeToInstruction(mode: string): string {
       return "Improve clarity, flow, and impact. You may lightly adjust tone and structure, but keep the meaning.";
   }
 }
+
 
 // 2) Rewrite selected text
 export const rewriteText = async (
@@ -106,6 +136,7 @@ ${input.text}
   }
 };
 
+
 // 3) Subject lines
 export const generateSubjectLines = async (
   req: AuthRequest,
@@ -137,7 +168,6 @@ Each subject line:
 
     const result = await OpenAIService.simple(systemPrompt, userPrompt);
 
-    // Very light parsing: split lines, filter non-empty.
     const lines = result
       .split("\n")
       .map((l) => l.replace(/^\s*\d+[\).]\s*/, "").trim())
@@ -152,6 +182,7 @@ Each subject line:
   }
 };
 
+
 // 4) Copilot chat
 export const copilotChat = async (
   req: AuthRequest,
@@ -160,30 +191,45 @@ export const copilotChat = async (
 ) => {
   try {
     const input = copilotSchema.parse(req.body);
-
     const ctx = input.context || {};
+    const authUserId = req.user?.id;
 
-const systemParts = [
-  "You are an AI newsletter copilot embedded inside a writing app.",
-  "You help with structure, clarity, tone, hooks, CTAs, and editing.",
-  "You can propose improvements or new sections, but avoid rewriting entire newsletters unless asked.",
-  ctx.title ? `Current newsletter title: ${ctx.title}` : "",
-  ctx.audience ? `Target audience: ${ctx.audience}` : "",
-  ctx.tone ? `Preferred tone: ${ctx.tone}` : "",
-  ctx.currentContent
-    ? "The user has existing content; you can reference it, but do not just repeat it."
-    : "",
-  "Your response must be ONLY the newsletter content or suggestions the user can paste into their newsletter.",
-  "Do NOT include any explanations, meta commentary, or instructions.",
-  "Do NOT include lines like 'I can tailor this...', 'Want a ready-to-paste section...', 'Let me know...', or any offer to help further.",
-  "Do NOT refer to yourself (no 'I', 'me', 'as an AI', etc.) unless the user explicitly asks you to write in first person in the newsletter itself.",
-  "Do NOT ask the user questions like 'Do you want me to...?' or 'Want a ready-to-paste section...?' at the end.",
-  "End your response with the final sentence of the content itself, not with an extra offer or comment.",
-  "Keep responses practical and concise. Where relevant, suggest concrete wording, not abstract advice.",
-].filter(Boolean);
+    // Optional: pull creator profile for niche
+    let creatorId: string | undefined;
+    let niche: string | undefined;
 
-const systemPrompt = systemParts.join("\n");
+    if (authUserId) {
+      const creator = await prisma.creatorProfile.findFirst({
+        where: { userId: authUserId },
+        select: { id: true, niche: true },
+      });
+      creatorId = creator?.id;
+      niche = creator?.niche || undefined;
+    }
 
+    const systemParts = [
+      BASE_SYSTEM_PROMPT,
+      "",
+      "You are an AI newsletter copilot embedded inside a writing app.",
+      "You help with structure, clarity, tone, hooks, CTAs, and editing.",
+      "You can propose improvements or new sections, but avoid rewriting entire newsletters unless asked.",
+      ctx.title ? `Current newsletter title: ${ctx.title}` : "",
+      ctx.audience ? `Target audience: ${ctx.audience}` : "",
+      ctx.tone ? `Preferred tone: ${ctx.tone}` : "",
+      niche ? `Creator niche/topic: ${niche}` : "",
+      ctx.currentContent
+        ? "The user has existing content; you can reference it, but do not just repeat it."
+        : "",
+      "Your response must be ONLY the newsletter content or suggestions the user can paste into their newsletter.",
+      "Do NOT include any explanations, meta commentary, or instructions.",
+      "Do NOT include lines like 'I can tailor this...', 'Want a ready-to-paste section...', 'Let me know...', or any offer to help further.",
+      "Do NOT refer to yourself (no 'I', 'me', 'as an AI', etc.) unless the user explicitly asks you to write in first person in the newsletter itself.",
+      "Do NOT ask the user questions like 'Do you want me to...?' or 'Want a ready-to-paste section...?' at the end.",
+      "End your response with the final sentence of the content itself, not with an extra offer or comment.",
+      "Keep responses practical and concise. Where relevant, suggest concrete wording, not abstract advice.",
+    ].filter(Boolean);
+
+    const systemPrompt = systemParts.join("\n");
 
     const messages = input.messages.map((m) => ({
       role: m.role,
@@ -192,8 +238,27 @@ const systemPrompt = systemParts.join("\n");
 
     const reply = await OpenAIService.chat(systemPrompt, messages);
 
+    // Store in DB as a suggestion for future fine-tuning
+    const lastUserMessage = [...messages].reverse().find(
+      (m) => m.role === "user"
+    );
+    const promptForStorage =
+      lastUserMessage?.content ?? JSON.stringify(messages);
+
+    const suggestion = await prisma.aiSuggestion.create({
+      data: {
+        userId: authUserId ?? null,
+        creatorId: creatorId ?? null,
+        type: "copilot",
+        mode: null,
+        prompt: promptForStorage,
+        reply,
+      },
+    });
+
     res.json({
       reply,
+      suggestionId: suggestion.id,
     });
   } catch (err) {
     next(err);
@@ -201,3 +266,43 @@ const systemPrompt = systemParts.join("\n");
 };
 
 
+export const acceptSuggestion = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authUserId = req.user?.id;
+
+    // 👇 Make sure TypeScript knows this is a definite string
+    const { id } = req.params as { id: string };
+
+    if (!id) {
+      return res.status(400).json({ message: "Suggestion id is required" });
+    }
+
+    const suggestion = await prisma.aiSuggestion.findUnique({
+      where: { id }, // id: string, not string | undefined
+    });
+
+    if (!suggestion) {
+      return res.status(404).json({ message: "Suggestion not found" });
+    }
+
+    // Optional: only owner can mark accepted
+    if (authUserId && suggestion.userId && suggestion.userId !== authUserId) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const updated = await prisma.aiSuggestion.update({
+      where: { id }, // again: guaranteed string
+      data: {
+        accepted: true,
+      },
+    });
+
+    return res.json({ success: true, suggestion: updated });
+  } catch (err) {
+    next(err);
+  }
+};

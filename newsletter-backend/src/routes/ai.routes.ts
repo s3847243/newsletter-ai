@@ -3,7 +3,7 @@ import {
   generateDraft,
   rewriteText,
   generateSubjectLines,
-  copilotChat,
+  copilotChat,acceptSuggestion
 } from "../controllers/ai.controller";
 import { requireAuth } from "../middlewares/auth";
 
@@ -17,3 +17,4 @@ aiRouter.post("/rewrite", rewriteText);
 aiRouter.post("/subject-lines", generateSubjectLines);
 aiRouter.post("/copilot", copilotChat);
 
+aiRouter.post("/suggestions/:id/accept", acceptSuggestion);
