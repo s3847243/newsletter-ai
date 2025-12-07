@@ -8,11 +8,21 @@ export const followCreator = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
-    const { creatorId } = req.params;
+     if (!req.user?.id) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    const userId: string = req.user.id;
 
+    // 2) Narrow params type so creatorId is a definite string
+    const { creatorId } = req.params as { creatorId: string };
+
+    if (!creatorId) {
+      return res.status(400).json({ message: "creatorId is required" });
+    }
+
+    // 3) Check that creator exists
     const creator = await prisma.creatorProfile.findUnique({
-      where: { id: creatorId },
+      where: { id: creatorId }, // creatorId: string ✅
       select: { id: true, userId: true },
     });
 
@@ -60,8 +70,8 @@ export const unfollowCreator = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
-    const { creatorId } = req.params;
+    const userId = req.user?.id!;
+    const { creatorId } = req.params as { creatorId: string };
 
     const existing = await prisma.follow.findUnique({
       where: {

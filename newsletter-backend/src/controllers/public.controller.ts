@@ -7,10 +7,14 @@ export const getPublicCreator = async (
   next: NextFunction
 ) => {
   try {
-    const { handle } = req.params;
+    const { handle } = req.params as { handle: string };
+
+    if (!handle) {
+      return res.status(400).json({ message: "Creator handle is required" });
+    }
 
     const creator = await prisma.creatorProfile.findUnique({
-      where: { handle },
+      where: { handle }, // now typed as string ✅
       include: {
         user: {
           select: { name: true, image: true },
@@ -41,7 +45,13 @@ export const getPublicIssueByHandleAndSlug = async (
   next: NextFunction
 ) => {
   try {
-    const { handle, slug } = req.params;
+     const { handle, slug } = req.params as { handle: string; slug: string };
+
+    if (!handle || !slug) {
+      return res
+        .status(400)
+        .json({ message: "Creator handle and issue slug are required" });
+    }
 
     const creator = await prisma.creatorProfile.findUnique({
       where: { handle },
@@ -81,7 +91,11 @@ export const getPublicCreatorIssues = async (
   next: NextFunction
 ) => {
   try {
-    const { handle } = req.params;
+    const { handle } = req.params as { handle: string };
+
+    if (!handle) {
+      return res.status(400).json({ message: "Creator handle is required" });
+    }
 
     const page = parseInt((req.query.page as string) || "1", 10);
     const pageSize = parseInt((req.query.pageSize as string) || "20", 10);

@@ -11,7 +11,9 @@ You help creators write:
 - personal stories
 - educational articles
 
-WRITING PRINCIPLES:
+WRITING PRINCIPLES
+
+:
 - Start with a clear, concrete HOOK in the first 1–2 sentences.
 - Use simple, conversational language (no corporate jargon).
 - Prefer short paragraphs (1–3 sentences).
@@ -30,7 +32,7 @@ FORMATTING:
 - No surrounding backticks unless explicitly requested.
 `.trim();
 
-// Very naive HTML → Markdown-ish converter so we don't feed raw tags.
+// Very naive HTML → Markdown-ish converter so we dont feed raw tags.
 // You can replace this later with a real library like "turndown".
 function htmlToMarkdown(html: string): string {
   let text = html;
@@ -177,8 +179,9 @@ async function main() {
 
   stream.end();
 
-  await new Promise((resolve) => stream.on("finish", resolve));
-
+  await new Promise<void>((resolve) => {
+    stream.on("finish", () => resolve());
+  });
   console.log(`Wrote ${allExamples.length} examples to ${outputPath}`);
   await prisma.$disconnect();
 }

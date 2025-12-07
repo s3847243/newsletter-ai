@@ -36,7 +36,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       data: {
         email: parsed.email,
         passwordHash,
-        name: parsed.name,
+        name: parsed.name ?? null,
       },
       select: {
         id: true,

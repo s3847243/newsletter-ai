@@ -8,7 +8,7 @@ export const getTimeline = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.id!;
 
     // Basic pagination
     const page = parseInt((req.query.page as string) || "1", 10);

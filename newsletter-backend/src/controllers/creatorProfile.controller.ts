@@ -12,7 +12,7 @@ export const getMyCreatorProfile = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.id!;
     const profile = await prisma.creatorProfile.findUnique({
       where: { userId },
     });
@@ -33,7 +33,7 @@ export const createCreatorProfile = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.id!;
     const parsed = createCreatorProfileSchema.parse(req.body);
 
     const existingProfile = await prisma.creatorProfile.findUnique({
@@ -55,9 +55,9 @@ export const createCreatorProfile = async (
         userId,
         handle: parsed.handle,
         displayName: parsed.displayName,
-        bio: parsed.bio,
-        avatarUrl: parsed.avatarUrl,
-        niche: parsed.niche,
+        bio: parsed.bio ?? null,
+        avatarUrl: parsed.avatarUrl ?? null,
+        niche: parsed.niche ?? null,
       },
     });
 
@@ -73,7 +73,7 @@ export const updateCreatorProfile = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.id!;
     const parsed = updateCreatorProfileSchema.parse(req.body);
 
     const existing = await prisma.creatorProfile.findUnique({
@@ -115,7 +115,11 @@ export const getCreatorByHandle = async (
   next: NextFunction
 ) => {
   try {
-    const { handle } = req.params;
+    const { handle } = req.params as { handle: string }; // 👈 tell TS it's string
+
+    if (!handle) {
+      return res.status(400).json({ message: "Creator handle is required" });
+    }
 
     const creator = await prisma.creatorProfile.findUnique({
       where: { handle },

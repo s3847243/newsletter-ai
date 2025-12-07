@@ -11,8 +11,11 @@ export const publishNewsletter = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    const userId = req.user?.id!;
+    const { id } = req.params as { id: string };
+    if (!id) {
+      return res.status(400).json({ message: "id is required" });
+    }
 
     // Find creator profile for user
     const creator = await prisma.creatorProfile.findUnique({

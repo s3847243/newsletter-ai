@@ -10,6 +10,10 @@ import { IssueStatus } from "../generated/prisma/enums";
 
 // Helper to get creatorId for a user
 async function getCreatorIdForUser(userId: string) {
+   if (!userId) {
+    // You can throw, or return null; I prefer throwing here:
+    throw new Error("No authenticated user id provided to getCreatorIdForUser");
+  }
   const profile = await prisma.creatorProfile.findUnique({
     where: { userId },
     select: { id: true },
@@ -47,7 +51,7 @@ export const listMyNewsletters = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.id!;
     const creatorId = await getCreatorIdForUser(userId);
 
     if (!creatorId) {
@@ -71,7 +75,7 @@ export const createNewsletter = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.id!;
     const creatorId = await getCreatorIdForUser(userId);
 
     if (!creatorId) {
@@ -88,8 +92,8 @@ export const createNewsletter = async (
         slug,
         htmlContent: parsed.htmlContent,
         status: IssueStatus.DRAFT,
-        emailSubject: parsed.emailSubject,
-        emailIntro: parsed.emailIntro,
+        emailSubject: parsed.emailSubject ?? null,
+        emailIntro: parsed.emailIntro ?? null,
       },
     });
 
@@ -105,8 +109,11 @@ export const getMyNewsletterById = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    const userId = req.user?.id!;
+    const { id } = req.params as { id: string };
+    if (!id) {
+      return res.status(400).json({ message: "id is required" });
+    }
     const creatorId = await getCreatorIdForUser(userId);
 
     if (!creatorId) {
@@ -133,8 +140,11 @@ export const updateMyNewsletter = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    const userId = req.user?.id!;
+    const { id } = req.params as { id: string };
+    if (!id) {
+      return res.status(400).json({ message: "id is required" });
+    }
     const creatorId = await getCreatorIdForUser(userId);
 
     if (!creatorId) {
@@ -175,8 +185,11 @@ export const deleteMyNewsletter = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.userId!;
-    const { id } = req.params;
+    const userId = req.user?.id!;
+    const { id } = req.params as { id: string };
+    if (!id) {
+      return res.status(400).json({ message: "id is required" });
+    }
     const creatorId = await getCreatorIdForUser(userId);
 
     if (!creatorId) {
