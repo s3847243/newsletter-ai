@@ -8,6 +8,7 @@ type CopilotMessage = {
   role: "user" | "assistant";
   content: string;
   id: string;
+  suggestionId?:string;
 };
 type CopilotApiMessage = {
   role: "user" | "assistant";
@@ -28,7 +29,9 @@ type CopilotRequest = {
 
 type CopilotResponse = {
   reply: string;
-};
+  suggestionId?: string;
+}
+
 
 export default function NotionStyleEditor() {
   const [title, setTitle] = useState("");
@@ -36,32 +39,22 @@ export default function NotionStyleEditor() {
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const { accessToken } = useAuth();
-  // AI Copilot state
   const [showCopilot, setShowCopilot] = useState(false);
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [copilotLoading, setCopilotLoading] = useState(false);
-
-  // Formatting state
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkText, setLinkText] = useState("");
-
-   // Selection toolbar state
   const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
   const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [savedRange, setSavedRange] = useState<Range | null>(null);
-
-  // Image modal state
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageAlt, setImageAlt] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [resizingImage, setResizingImage] = useState<HTMLImageElement | null>(null);
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0 });
   // Rewrite state
   const [showRewritePanel, setShowRewritePanel] = useState(false);
   const [rewriteMode, setRewriteMode] = useState<
@@ -114,7 +107,6 @@ export default function NotionStyleEditor() {
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [showLinkInput, showRewritePanel]);
-    // Click outside to close link input
   useEffect(() => {
     if (!showLinkInput) return;
 
@@ -127,7 +119,6 @@ export default function NotionStyleEditor() {
       }
     };
 
-    // Use a small delay to allow the button click to register first
     setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
     }, 0);
@@ -141,7 +132,6 @@ export default function NotionStyleEditor() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     setSaving(false);
   };
-  // Handle Ctrl+Click on links in the editor
   useEffect(() => {
     const handleEditorClick = (e: MouseEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.target instanceof HTMLElement) {
@@ -441,21 +431,18 @@ export default function NotionStyleEditor() {
     const prompt = copilotInput.trim();
     if (!prompt || copilotLoading) return;
 
-    // 1. Build the new user message
     const userMsg: CopilotMessage = {
       role: "user",
       content: prompt,
       id: Date.now().toString(),
     };
 
-    // 2. Update local state immediately for snappy UI
     const newMessages: CopilotMessage[] = [...copilotMessages, userMsg];
     setCopilotMessages(newMessages);
     setCopilotInput("");
     setCopilotLoading(true);
 
     try {
-      // 3. Build context from editor
       const currentContent =
         editorRef.current?.innerHTML && editorRef.current.innerHTML !== "<p><br></p>"
           ? editorRef.current.innerHTML
@@ -464,9 +451,7 @@ export default function NotionStyleEditor() {
       const body: CopilotRequest = {
         context: {
           title: title || undefined,
-          // you can feed these later if you have them:
-          // audience: ...,
-          // tone: ...,
+         
           currentContent,
         },
         messages: newMessages.map((m) => ({
@@ -475,7 +460,6 @@ export default function NotionStyleEditor() {
         })),
       };
 
-      // 4. Call your backend
       const res = await apiFetch<CopilotResponse>(
         "/ai/copilot",
         {
@@ -485,22 +469,20 @@ export default function NotionStyleEditor() {
         accessToken
       );
 
-      // 5. Append assistant reply
       const aiMsg: CopilotMessage = {
         role: "assistant",
         content: res.reply,
         id: (Date.now() + 1).toString(),
+        suggestionId: res.suggestionId,  
       };
 
       setCopilotMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
       console.error("Copilot error", err);
-      // Optional: show a toast or inline error message
     } finally {
       setCopilotLoading(false);
     }
   };
-  // Open rewrite panel for current selection
   const openRewritePanel = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -518,7 +500,6 @@ export default function NotionStyleEditor() {
     setShowRewritePanel(true);
   };
 
-  // Call backend /ai/rewrite with selected text + mode
   const runRewrite = async () => {
     if (!rewriteRange || rewriteLoading) return;
 
@@ -546,24 +527,20 @@ export default function NotionStyleEditor() {
       setRewriteSuggestion(res.rewritten.trim());
     } catch (err) {
       console.error("Rewrite error", err);
-      // Optional: show toast or inline error
     } finally {
       setRewriteLoading(false);
     }
   };
 
-  // Accept rewrite: replace selection contents with suggestion
   const acceptRewrite = () => {
     if (!rewriteRange || !rewriteSuggestion || !editorRef.current) return;
 
     const selection = window.getSelection();
     if (!selection) return;
 
-    // Restore range
     selection.removeAllRanges();
     selection.addRange(rewriteRange);
 
-    // Replace selected content
     rewriteRange.deleteContents();
 
     const frag = document.createDocumentFragment();
@@ -578,41 +555,46 @@ export default function NotionStyleEditor() {
 
     rewriteRange.insertNode(frag);
 
-    // Collapse cursor at end of inserted text
     const newRange = document.createRange();
     newRange.setStartAfter(rewriteRange.endContainer);
     newRange.collapse(true);
     selection.removeAllRanges();
     selection.addRange(newRange);
 
-    // Cleanup state
     setShowRewritePanel(false);
     setRewriteSuggestion("");
     setRewriteRange(null);
   };
 
-  // Discard rewrite suggestion
   const discardRewrite = () => {
     setShowRewritePanel(false);
     setRewriteSuggestion("");
     setRewriteRange(null);
   };
 
-const acceptSuggestion = (message: CopilotMessage) => {
+const acceptSuggestion = async (message: CopilotMessage) => {
   if (!editorRef.current) return;
 
+  
+  if (message.suggestionId && accessToken) {
+    try {
+      await apiFetch<{ success: boolean; suggestion: any }>(
+        `/ai/suggestions/${message.suggestionId}/accept`,
+        { method: "POST" },
+        accessToken
+      );
+    } catch (err) {
+      console.error("Failed to mark suggestion as accepted", err);
+    }
+  }
   const editor = editorRef.current;
-
-  // Turn plain text into simple paragraphs
   const html = message.content
     .split("\n")
     .map((line) => `<p>${line || "<br>"}</p>`)
     .join("");
 
-  // Append at the end for now
   editor.insertAdjacentHTML("beforeend", html);
 
-  // Optionally: scroll editor to bottom
   editor.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "end" });
   setCopilotMessages([])
 };
@@ -665,7 +647,7 @@ const acceptSuggestion = (message: CopilotMessage) => {
             disabled={saving}
             className="rounded-lg bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? "Publishing..." : "Publish"}
           </button>
         </div>
       </div>
