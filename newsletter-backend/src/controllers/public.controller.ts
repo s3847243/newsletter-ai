@@ -45,7 +45,7 @@ export const getPublicIssueByHandleAndSlug = async (
   next: NextFunction
 ) => {
   try {
-     const { handle, slug } = req.params as { handle: string; slug: string };
+    const { handle, slug } = req.params as { handle: string; slug: string };
 
     if (!handle || !slug) {
       return res
@@ -55,7 +55,11 @@ export const getPublicIssueByHandleAndSlug = async (
 
     const creator = await prisma.creatorProfile.findUnique({
       where: { handle },
-      select: { id: true },
+      include: {
+        user: {
+          select: { name: true, image: true },
+        },
+      },
     });
 
     if (!creator) {
@@ -66,7 +70,16 @@ export const getPublicIssueByHandleAndSlug = async (
       where: {
         creatorId: creator.id,
         slug,
-        status: IssueStatus.PUBLISHED, // only published issues public
+        status: IssueStatus.PUBLISHED,
+      },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        htmlContent: true,
+        publishedAt: true,
+        viewCount: true,
+        emailIntro: true,
       },
     });
 
@@ -74,13 +87,24 @@ export const getPublicIssueByHandleAndSlug = async (
       return res.status(404).json({ message: "Issue not found" });
     }
 
-    
+    // Increment view count
     await prisma.newsletterIssue.update({
       where: { id: issue.id },
       data: { viewCount: issue.viewCount + 1 },
     });
 
-    res.json(issue);
+    // Return both creator + issue
+    res.json({
+      creator: {
+        id: creator.id,
+        handle: creator.handle,
+        displayName: creator.displayName,
+        bio: creator.bio,
+        avatarUrl: creator.avatarUrl,
+        user: creator.user, // has { name, image }
+      },
+      issue,
+    });
   } catch (err) {
     next(err);
   }

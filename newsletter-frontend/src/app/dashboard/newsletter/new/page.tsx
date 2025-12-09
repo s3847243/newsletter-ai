@@ -125,13 +125,111 @@ export default function NotionStyleEditor() {
 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLinkInput]);
-  const handleSave = async () => {
-    setSaving(true);
+    
+  // If you later reuse this for editing, you can pass an initial id as a prop
+  const [issueId, setIssueId] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState<string | null>(null);
+  // Single canonical save logic: create or update and return id
+  const handlePublish = async () => {
+    if (!accessToken) {
+      setPublishError("You must be logged in to publish.");
+      return;
+    }
+
+    setPublishing(true);
+    setPublishError(null);
+    setPublishSuccess(null);
+
     const htmlContent = editorRef.current?.innerHTML || "";
-    console.log("Saving:", { title, htmlContent });
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSaving(false);
+
+    try {
+      // Basic validation
+      if (!title.trim()) {
+        throw new Error("Title is required");
+      }
+      if (!htmlContent.trim() || htmlContent === "<p><br></p>") {
+        throw new Error("Content cannot be empty");
+      }
+
+      // 1) Create or update the issue with latest content
+      let id = issueId;
+
+      if (!id) {
+        // First time → create
+        const created = await apiFetch<{
+          id: string;
+          title: string;
+          slug: string;
+          htmlContent: string;
+          status: string;
+        }>(
+          "/newsletters",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              title,
+              htmlContent,
+            }),
+          },
+          accessToken
+        );
+
+        id = created.id;
+        setIssueId(id);
+      } else {
+        // Editing existing issue → update
+        await apiFetch(
+          `/newsletters/${id}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              title,
+              htmlContent,
+            }),
+          },
+          accessToken
+        );
+      }
+
+      if (!id) {
+        throw new Error("Failed to determine issue id after save.");
+      }
+
+      // 2) Publish that issue
+      const res = await apiFetch<{
+        message: string;
+        issue: {
+          id: string;
+          status: string;
+          publishedAt: string | null;
+        };
+        publicUrl?: string;
+      }>(
+        `/newsletters/${id}/publish`,
+        {
+          method: "POST",
+        },
+        accessToken
+      );
+
+      setPublishSuccess(res.message || "Published successfully.");
+      console.log(res.publicUrl)
+      if (res.publicUrl) {
+        window.open(res.publicUrl, "_blank");
+      }
+    } catch (err: any) {
+      console.error("Publish failed", err);
+      setPublishError(err?.message || "Failed to publish issue.");
+    } finally {
+      setPublishing(false);
+    }
   };
+
+
+
   useEffect(() => {
     const handleEditorClick = (e: MouseEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.target instanceof HTMLElement) {
@@ -643,12 +741,18 @@ const acceptSuggestion = async (message: CopilotMessage) => {
             </span>
           </div>
           <button
-            onClick={handleSave}
-            disabled={saving}
+            onClick={handlePublish}
+            disabled={publishing}
             className="rounded-lg bg-neutral-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
           >
             {saving ? "Publishing..." : "Publish"}
           </button>
+          {publishError && (
+            <p className="text-xs text-red-500 mt-1">{publishError}</p>
+          )}
+          {publishSuccess && (
+            <p className="text-xs text-green-600 mt-1">{publishSuccess}</p>
+          )}
         </div>
       </div>
       <div className="mx-auto max-w-4xl px-8 pt-24 pb-32">
