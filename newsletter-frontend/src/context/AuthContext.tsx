@@ -8,7 +8,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { apiFetch } from "@/lib/apiClient";
+import { apiFetch, setTokens } from "@/lib/apiClient"; // ⬅️ note setTokens import
 import { AuthUser, AuthResponse } from "@/types/auth";
 import { clearAuth, loadAuth, saveAuth } from "@/lib/authStorage";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,9 @@ import { useRouter } from "next/navigation";
 interface AuthContextValue {
   user: AuthUser | null;
   accessToken: string | null;
+  refreshToken: string | null;
+  // ⬇️ setAuth works with the backend AuthResponse shape
+  setAuth: (resp: AuthResponse) => void;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -32,24 +35,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Load from localStorage on mount
+  // 🔹 Load from localStorage on mount
   useEffect(() => {
-    const stored = loadAuth();
-    setUser(stored.user);
-    setAccessToken(stored.accessToken);
-    setRefreshToken(stored.refreshToken);
+    const stored = loadAuth(); // { user, accessToken, refreshToken } | empty
+    setUser(stored.user || null);
+    setAccessToken(stored.accessToken || null);
+    setRefreshToken(stored.refreshToken || null);
+
+    // keep apiClient's global tokens in sync
+    setTokens(stored.accessToken || null, stored.refreshToken || null);
+
     setLoading(false);
   }, []);
 
+  // 🔹 Central place to update auth state + storage + apiClient
   const setAuth = useCallback((resp: AuthResponse) => {
     setUser(resp.user);
     setAccessToken(resp.accessToken);
     setRefreshToken(resp.refreshToken);
+
+    // persist
     saveAuth({
       user: resp.user,
       accessToken: resp.accessToken,
       refreshToken: resp.refreshToken,
     });
+
+    // sync with apiClient for auto-refresh + Authorization header
+    setTokens(resp.accessToken, resp.refreshToken);
   }, []);
 
   const login = useCallback(
@@ -58,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
+
       setAuth(resp);
       router.push("/dashboard");
     },
@@ -70,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: JSON.stringify({ name, email, password }),
       });
+
       setAuth(resp);
       router.push("/dashboard");
     },
@@ -81,12 +96,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     setRefreshToken(null);
     clearAuth();
+
+    // clear tokens in apiClient too
+    setTokens(null, null);
+
     router.push("/login");
   }, [router]);
 
   const value: AuthContextValue = {
     user,
     accessToken,
+    refreshToken,
+    setAuth,
     isAuthenticated: !!user && !!accessToken,
     loading,
     login,
