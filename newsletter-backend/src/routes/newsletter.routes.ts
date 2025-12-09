@@ -15,7 +15,7 @@ newsletterRouter.use(requireAuth);
 newsletterRouter.get("/", listMyNewsletters);
 newsletterRouter.post("/", createNewsletter);
 newsletterRouter.get("/:id", getMyNewsletterById);
-newsletterRouter.patch("/:id", updateMyNewsletter);
+newsletterRouter.put("/:id", updateMyNewsletter);
 newsletterRouter.delete("/:id", deleteMyNewsletter);
 
 // NEW:
