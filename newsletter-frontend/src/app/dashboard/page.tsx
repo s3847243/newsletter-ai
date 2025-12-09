@@ -116,14 +116,23 @@ export default function DashboardHome() {
                   <td className="px-4 py-2 text-sm text-gray-600">
                     {issue.viewCount}
                   </td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="px-4 py-2 text-right flex justify-end items-center gap-3">
                     <Link
                       href={`/dashboard/newsletter/${issue.id}`}
                       className="text-indigo-600 hover:underline text-sm"
                     >
                       Edit
                     </Link>
+
+                    <span className="text-gray-300">|</span>
+
+                    <button
+                      className="text-red-600 hover:underline text-sm"
+                    >
+                      Delete
+                    </button>
                   </td>
+
                 </tr>
               ))}
             </tbody>

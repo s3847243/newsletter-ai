@@ -59,7 +59,7 @@ export const listMyNewsletters = async (
     }
 
     const issues = await prisma.newsletterIssue.findMany({
-      where: { creatorId },
+      where: { creatorId,deletedAt: null, },
       orderBy: { createdAt: "desc" },
     });
 
@@ -210,6 +210,111 @@ export const deleteMyNewsletter = async (
     });
 
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+};
+/**
+ * DELETE /api/v1/newsletters/:id
+ * Soft delete: set deletedAt, keep row for analytics / training etc.
+ */
+export const softDeleteNewsletter = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user?.id!;
+    const { id } = req.params as { id: string };
+
+    if (!id) {
+      return res.status(400).json({ message: "Newsletter id is required" });
+    }
+
+    const creatorId = await getCreatorIdForUser(userId);
+    if (!creatorId) {
+      return res
+        .status(400)
+        .json({ message: "You must create a creator profile first" });
+    }
+
+    const issue = await prisma.newsletterIssue.findFirst({
+      where: {
+        id,
+        creatorId,
+        deletedAt: null, // only non-deleted can be deleted
+      },
+    });
+
+    if (!issue) {
+      return res.status(404).json({ message: "Newsletter not found" });
+    }
+
+    const deletedAt = new Date();
+
+    const updated = await prisma.newsletterIssue.update({
+      where: { id: issue.id },
+      data: {
+        deletedAt,
+      },
+    });
+
+    return res.status(200).json({
+      message: "Issue moved to trash",
+      issue: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/v1/newsletters/:id/restore
+ * Restore a soft-deleted issue.
+ */
+export const restoreNewsletter = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user?.id!;
+    const { id } = req.params as { id: string };
+
+    if (!id) {
+      return res.status(400).json({ message: "Newsletter id is required" });
+    }
+
+    const creatorId = await getCreatorIdForUser(userId);
+    if (!creatorId) {
+      return res
+        .status(400)
+        .json({ message: "You must create a creator profile first" });
+    }
+
+    const issue = await prisma.newsletterIssue.findFirst({
+      where: {
+        id,
+        creatorId,
+        deletedAt: { not: null }, // only restore deleted ones
+      },
+    });
+
+    if (!issue) {
+      return res.status(404).json({ message: "Newsletter not found in trash" });
+    }
+
+    const restored = await prisma.newsletterIssue.update({
+      where: { id: issue.id },
+      data: {
+        deletedAt: null,
+      },
+    });
+
+    return res.status(200).json({
+      message: "Issue restored",
+      issue: restored,
+    });
   } catch (err) {
     next(err);
   }

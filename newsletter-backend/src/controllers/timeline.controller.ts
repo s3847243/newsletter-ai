@@ -44,6 +44,7 @@ export const getTimeline = async (
           creatorId: { in: creatorIds },
           status: IssueStatus.PUBLISHED,
           publishedAt: { not: null },
+          deletedAt: null,
         },
         include: {
           creator: {

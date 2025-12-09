@@ -93,7 +93,7 @@ model NewsletterIssue {
 
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
-
+  deletedAt    DateTime?       
   @@unique([creatorId, slug])
 }
 model AiSuggestion {

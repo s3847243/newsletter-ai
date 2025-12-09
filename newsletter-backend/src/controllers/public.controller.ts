@@ -71,6 +71,7 @@ export const getPublicIssueByHandleAndSlug = async (
         creatorId: creator.id,
         slug,
         status: IssueStatus.PUBLISHED,
+        deletedAt: null,
       },
       select: {
         id: true,
@@ -148,6 +149,7 @@ export const getPublicCreatorIssues = async (
         where: {
           creatorId: creator.id,
           status: "PUBLISHED",
+          deletedAt: null,
         },
         orderBy: {
           publishedAt: "desc",
