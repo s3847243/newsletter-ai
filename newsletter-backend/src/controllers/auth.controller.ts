@@ -4,21 +4,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
 import { env } from "../config/env";
 import { loginSchema, registerSchema } from "../routes/auth.schemas";
-
-const ACCESS_EXPIRES_IN = "15m";
-const REFRESH_EXPIRES_IN = "7d";
-
-function signAccessToken(userId: string) {
-  return jwt.sign({ sub: userId }, env.jwtAccessSecret, {
-    expiresIn: ACCESS_EXPIRES_IN,
-  });
-}
-
-function signRefreshToken(userId: string) {
-  return jwt.sign({ sub: userId }, env.jwtRefreshSecret, {
-    expiresIn: REFRESH_EXPIRES_IN,
-  });
-}
+import { signAccessToken,signRefreshToken, verifyRefreshToken, } from "../lib/jwt";
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -45,8 +31,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       },
     });
 
-    const accessToken = signAccessToken(user.id);
-    const refreshToken = signRefreshToken(user.id);
+    const accessToken = signAccessToken({ id: user.id, email: user.email });
+    const refreshToken = signRefreshToken({ id: user.id, email: user.email });
 
     res.status(201).json({
       user,
@@ -75,8 +61,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const accessToken = signAccessToken(user.id);
-    const refreshToken = signRefreshToken(user.id);
+    const accessToken = signAccessToken({ id: user.id, email: user.email });
+    const refreshToken = signRefreshToken({ id: user.id, email: user.email });
 
     res.json({
       user: {
@@ -86,6 +72,58 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       },
       accessToken,
       refreshToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const refreshTokenHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { refreshToken } = req.body as { refreshToken?: string };
+
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Missing refresh token" });
+    }
+
+    let payload: { sub: string; email: string };
+    try {
+      payload = verifyRefreshToken(refreshToken);
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid or expired refresh token" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, name: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    const newAccessToken = signAccessToken({
+      id: user.id,
+      email: user.email,
+    });
+
+    const newRefreshToken = signRefreshToken({
+      id: user.id,
+      email: user.email,
+    });
+
+    return res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
     });
   } catch (err) {
     next(err);

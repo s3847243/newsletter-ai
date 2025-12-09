@@ -1,13 +1,14 @@
 import type{ Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
+import { verifyAccessToken } from "../lib/jwt";
 export type AuthUser = {
   id: string;
   email?: string | undefined;
 };
 type JwtPayload = {
   sub: string;
-  email?: string; // only if you actually encode it
+  email?: string; 
 };
 export interface AuthRequest extends Request {
   user?: AuthUser;  
@@ -23,12 +24,12 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   const token = header.slice("Bearer ".length);
 
   try {
-    const payload = jwt.verify(token, env.jwtAccessSecret) as JwtPayload;
+    const payload = verifyAccessToken(token);
+
     req.user = {
       id: payload.sub,
       email: payload.email,
     };
-
 
     next();
   } catch (err) {
