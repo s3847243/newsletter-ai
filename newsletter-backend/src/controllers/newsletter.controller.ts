@@ -5,13 +5,11 @@ import {
   createNewsletterSchema,
   updateNewsletterSchema,
 } from "../routes/newsletter.schemas";
-import { slugify } from "../utils/slugify";
 import { IssueStatus } from "../generated/prisma/enums";
-
-// Helper to get creatorId for a user
+import slugify from "slugify";
+import crypto from "node:crypto";
 async function getCreatorIdForUser(userId: string) {
    if (!userId) {
-    // You can throw, or return null; I prefer throwing here:
     throw new Error("No authenticated user id provided to getCreatorIdForUser");
   }
   const profile = await prisma.creatorProfile.findUnique({
@@ -21,29 +19,29 @@ async function getCreatorIdForUser(userId: string) {
   return profile?.id ?? null;
 }
 
-// Ensure slug uniqueness per creator
-async function generateUniqueSlug(creatorId: string, title: string): Promise<string> {
-  const base = slugify(title || "untitled");
-  if (!base) {
-    return `issue-${Date.now()}`;
-  }
+// // Ensure slug uniqueness per creator
+// async function generateUniqueSlug(creatorId: string, title: string): Promise<string> {
+//   const base = slugify(title || "untitled");
+//   if (!base) {
+//     return `issue-${Date.now()}`;
+//   }
 
-  let slug = base;
-  let counter = 2;
+//   let slug = base;
+//   let counter = 2;
 
-  while (true) {
-    const existing = await prisma.newsletterIssue.findFirst({
-      where: { creatorId, slug },
-      select: { id: true },
-    });
+//   while (true) {
+//     const existing = await prisma.newsletterIssue.findFirst({
+//       where: { creatorId, slug },
+//       select: { id: true },
+//     });
 
-    if (!existing) {
-      return slug;
-    }
+//     if (!existing) {
+//       return slug;
+//     }
 
-    slug = `${base}-${counter++}`;
-  }
-}
+//     slug = `${base}-${counter++}`;
+//   }
+// }
 
 export const listMyNewsletters = async (
   req: AuthRequest,
@@ -69,6 +67,13 @@ export const listMyNewsletters = async (
   }
 };
 
+
+function makeSlugWithRandomId(title: string) {
+  const base = slugify(title, { lower: true, strict: true }) || "post";
+  const shortId = crypto.randomUUID().replace(/-/g, "").slice(-12);
+  return `${base}-${shortId}`;
+}
+
 export const createNewsletter = async (
   req: AuthRequest,
   res: Response,
@@ -83,8 +88,8 @@ export const createNewsletter = async (
     }
 
     const parsed = createNewsletterSchema.parse(req.body);
-    const slug = await generateUniqueSlug(creatorId, parsed.title);
-
+    
+    const slug = makeSlugWithRandomId(parsed.title);
     const issue = await prisma.newsletterIssue.create({
       data: {
         creatorId,
@@ -161,7 +166,6 @@ export const updateMyNewsletter = async (
       return res.status(404).json({ message: "Newsletter not found" });
     }
 
-    // For now, don't allow changing slug automatically to avoid breaking URLs.
     const updated = await prisma.newsletterIssue.update({
       where: { id },
       data: {
@@ -207,7 +211,7 @@ export const softDeleteNewsletter = async (
       where: {
         id,
         creatorId,
-        deletedAt: null, // only non-deleted can be deleted
+        deletedAt: null, 
       },
     });
 
