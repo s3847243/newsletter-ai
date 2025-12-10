@@ -17,7 +17,6 @@ interface AuthContextValue {
   user: AuthUser | null;
   accessToken: string | null;
   refreshToken: string | null;
-  // ⬇️ setAuth works with the backend AuthResponse shape
   setAuth: (resp: AuthResponse) => void;
   isAuthenticated: boolean;
   loading: boolean;

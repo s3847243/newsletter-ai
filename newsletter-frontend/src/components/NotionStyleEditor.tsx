@@ -181,8 +181,7 @@ export default function NotionStyleEditor({
             title,
             htmlContent,
           }),
-        },
-        accessToken
+        }
       );
       currentIssueId = created.id;
     } else {
@@ -195,8 +194,7 @@ export default function NotionStyleEditor({
             title,
             htmlContent,
           }),
-        },
-        accessToken
+        }
       );
     }
 
@@ -207,8 +205,7 @@ export default function NotionStyleEditor({
       publicUrl?: string;
     }>(
       `/newsletters/${currentIssueId}/publish`,
-      { method: "POST", body: undefined }, // if your route is /newsletters/:id/publish change this url
-      accessToken
+      { method: "POST", body: undefined }
     );
 
     // If your publish endpoint is /newsletters/:id/publish, use:
@@ -654,8 +651,7 @@ export default function NotionStyleEditor({
         {
           method: "POST",
           body: JSON.stringify(body),
-        },
-        accessToken
+        }
       );
 
       const aiMsg: CopilotMessage = {
@@ -709,8 +705,7 @@ export default function NotionStyleEditor({
         {
           method: "POST",
           body: JSON.stringify(body),
-        },
-        accessToken
+        }
       );
 
       setRewriteSuggestion(res.rewritten.trim());
@@ -769,8 +764,7 @@ const acceptSuggestion = async (message: CopilotMessage) => {
     try {
       await apiFetch<{ success: boolean; suggestion: any }>(
         `/ai/suggestions/${message.suggestionId}/accept`,
-        { method: "POST" },
-        accessToken
+        { method: "POST" }
       );
     } catch (err) {
       console.error("Failed to mark suggestion as accepted", err);

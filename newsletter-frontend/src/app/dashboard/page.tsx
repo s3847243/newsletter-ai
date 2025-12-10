@@ -11,6 +11,16 @@ export default function DashboardHome() {
   const [issues, setIssues] = useState<NewsletterIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+    // Delete modal state
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Snackbar state
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarIssue, setSnackbarIssue] = useState<NewsletterIssue | null>(
+    null
+  );
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -22,8 +32,7 @@ export default function DashboardHome() {
       try {
         const data = await apiFetch<NewsletterIssue[]>(
           "/newsletters",
-          {},
-          accessToken
+          {}
         );
         if (!cancelled) {
           setIssues(data);
@@ -41,7 +50,67 @@ export default function DashboardHome() {
       cancelled = true;
     };
   }, [accessToken]);
+  // Auto-hide snackbar after 5s
+  useEffect(() => {
+    if (!snackbarVisible) return;
+    const t = setTimeout(() => {
+      setSnackbarVisible(false);
+      setSnackbarIssue(null);
+      setSnackbarMessage("");
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [snackbarVisible]);
 
+  const openDeleteModal = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteId || !accessToken) return;
+    setDeleteLoading(true);
+
+    try {
+      const res = await apiFetch<{ message: string; issue: NewsletterIssue }>(
+        `/newsletters/${deleteId}`,
+        { method: "DELETE" }
+      );
+
+      // Remove from list optimistically
+      setIssues((prev) => prev.filter((i) => i.id !== deleteId));
+      console.log(res)
+      // Show snackbar with undo
+      setSnackbarIssue(res.issue);
+      setSnackbarMessage("Issue moved to trash.");
+      setSnackbarVisible(true);
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      setError(apiErr.message || "Failed to delete issue");
+    } finally {
+      setDeleteLoading(false);
+      setDeleteId(null);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!snackbarIssue || !accessToken) return;
+
+    try {
+      const res = await apiFetch<{ message: string; issue: NewsletterIssue }>(
+        `/newsletters/${snackbarIssue.id}/restore`,
+        { method: "POST" }
+      );
+
+      // Put it back into the list (at top)
+      setIssues((prev) => [res.issue, ...prev]);
+
+      setSnackbarVisible(false);
+      setSnackbarIssue(null);
+      setSnackbarMessage("");
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      setError(apiErr.message || "Failed to restore issue");
+    }
+  };
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -127,16 +196,65 @@ export default function DashboardHome() {
                     <span className="text-gray-300">|</span>
 
                     <button
-                      className="text-red-600 hover:underline text-sm"
-                    >
-                      Delete
-                    </button>
+                        type="button"
+                        onClick={() => openDeleteModal(issue.id)}
+                        className="text-red-600 hover:underline text-sm"
+                      >
+                        Delete
+                      </button>
                   </td>
 
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Delete confirmation modal */}
+      {deleteId && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg space-y-3">
+            <h3 className="text-sm font-semibold">Delete this issue?</h3>
+            <p className="text-xs text-gray-600">
+              This will move the issue to trash. It won&apos;t be visible in
+              your dashboard, timeline, or public page. You can still restore it
+              for now via Undo.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteId(null)}
+                className="px-3 py-1.5 text-xs rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Snackbar with Undo */}
+      {snackbarVisible && (
+        <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
+          <div className="flex items-center gap-4 rounded-full bg-gray-900 text-white px-4 py-2 text-xs shadow-lg">
+            <span>{snackbarMessage}</span>
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="font-semibold underline underline-offset-2"
+            >
+              Undo
+            </button>
+          </div>
         </div>
       )}
     </div>

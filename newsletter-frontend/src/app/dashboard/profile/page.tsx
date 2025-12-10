@@ -30,8 +30,7 @@ export default function ProfilePage() {
       try {
         const data = await apiFetch<CreatorProfile>(
           "/creator-profile/me",
-          {},
-          accessToken
+          {}
         );
         if (!cancelled) {
           setProfile(data);
@@ -88,8 +87,7 @@ export default function ProfilePage() {
           {
             method: "PUT",
             body: JSON.stringify(payload),
-          },
-          accessToken
+          }
         );
       } else {
         // Create
@@ -98,8 +96,7 @@ export default function ProfilePage() {
           {
             method: "POST",
             body: JSON.stringify(payload),
-          },
-          accessToken
+          }
         );
       }
       setProfile(result);

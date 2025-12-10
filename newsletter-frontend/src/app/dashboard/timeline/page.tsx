@@ -45,8 +45,7 @@ export default function TimelinePage() {
       try {
         const data = await apiFetch<TimelineResponse>(
           `/timeline?page=${page}&pageSize=${pageSize}`,
-          {},
-          accessToken
+          {}
         );
         if (!cancelled) {
           setItems(data.items);
@@ -73,8 +72,7 @@ export default function TimelinePage() {
     try {
       const data = await apiFetch<{ items: CreatorSummary[] }>(
         "/creators/following",
-        {},
-        accessToken
+        {}
       );
       setFollowing(data.items || []);
     } catch (err) {
@@ -105,8 +103,7 @@ export default function TimelinePage() {
       try {
         const data = await apiFetch<{ items: CreatorSummary[] }>(
           `/creators/search?query=${encodeURIComponent(searchQuery.trim())}`,
-          {},
-          accessToken
+          {}
         );
         setSearchResults(data.items || []);
       } catch (err: any) {
@@ -126,14 +123,12 @@ export default function TimelinePage() {
       if (shouldFollow) {
         await apiFetch(
           `/creators/${creatorId}/follow`,
-          { method: "POST" },
-          accessToken
+          { method: "POST" }
         );
       } else {
         await apiFetch(
           `/creators/${creatorId}/unfollow`,
-          { method: "POST" },
-          accessToken
+          { method: "POST" }
         );
       }
 
@@ -149,8 +144,7 @@ export default function TimelinePage() {
     try {
       const data = await apiFetch<TimelineResponse>(
         `/timeline?page=${page}&pageSize=${pageSize}`,
-        {},
-        accessToken
+        {}
       );
       setItems(data.items);
       setTotal(data.total);

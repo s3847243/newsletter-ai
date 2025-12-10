@@ -33,15 +33,13 @@ export function FollowButton({
       if (isFollowing) {
         await apiFetch(
           `/creators/${creatorId}/unfollow`,
-          { method: "POST" },
-          accessToken
+          { method: "POST" }
         );
         setIsFollowing(false);
       } else {
         await apiFetch(
           `/creators/${creatorId}/follow`,
-          { method: "POST" },
-          accessToken
+          { method: "POST" }
         );
         setIsFollowing(true);
       }

@@ -29,8 +29,6 @@ export function SubscribeForm({ creatorHandle }: SubscribeFormProps) {
             email,
           }),
         },
-        // no access token – anonymous subscribe is allowed
-        undefined
       );
       setSuccess("You are subscribed! Check your inbox for future issues.");
       setEmail("");

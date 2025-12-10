@@ -26,8 +26,7 @@ export default function EditNewsletterPage() {
       try {
         const data = await apiFetch<NewsletterIssue>(
           `/newsletters/${id}`,
-          { method: "GET" },
-          accessToken
+          { method: "GET" }
         );
         console.log(data)
         setIssue(data);
