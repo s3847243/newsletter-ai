@@ -179,41 +179,6 @@ export const updateMyNewsletter = async (
   }
 };
 
-export const deleteMyNewsletter = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const userId = req.user?.id!;
-    const { id } = req.params as { id: string };
-    if (!id) {
-      return res.status(400).json({ message: "id is required" });
-    }
-    const creatorId = await getCreatorIdForUser(userId);
-
-    if (!creatorId) {
-      return res.status(400).json({ message: "You must create a creator profile first" });
-    }
-
-    const existing = await prisma.newsletterIssue.findFirst({
-      where: { id, creatorId },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return res.status(404).json({ message: "Newsletter not found" });
-    }
-
-    await prisma.newsletterIssue.delete({
-      where: { id },
-    });
-
-    res.status(204).send();
-  } catch (err) {
-    next(err);
-  }
-};
 /**
  * DELETE /api/v1/newsletters/:id
  * Soft delete: set deletedAt, keep row for analytics / training etc.
@@ -259,10 +224,7 @@ export const softDeleteNewsletter = async (
       },
     });
 
-    return res.status(200).json({
-      message: "Issue moved to trash",
-      issue: updated,
-    });
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -296,7 +258,7 @@ export const restoreNewsletter = async (
       where: {
         id,
         creatorId,
-        deletedAt: { not: null }, // only restore deleted ones
+        deletedAt: { not: null },
       },
     });
 

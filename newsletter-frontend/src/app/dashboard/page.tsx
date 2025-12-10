@@ -66,10 +66,11 @@ export default function DashboardHome() {
   };
 
   const handleConfirmDelete = async () => {
-    if (!deleteId || !accessToken) return;
+    if (!deleteId) return;
     setDeleteLoading(true);
 
     try {
+      const deletedIssue = issues.find((i) => i.id === deleteId) || null;
       const res = await apiFetch<{ message: string; issue: NewsletterIssue }>(
         `/newsletters/${deleteId}`,
         { method: "DELETE" }
@@ -77,11 +78,12 @@ export default function DashboardHome() {
 
       // Remove from list optimistically
       setIssues((prev) => prev.filter((i) => i.id !== deleteId));
-      console.log(res)
-      // Show snackbar with undo
-      setSnackbarIssue(res.issue);
-      setSnackbarMessage("Issue moved to trash.");
-      setSnackbarVisible(true);
+     // Show snackbar with undo using the local copy
+      if (deletedIssue) {
+        setSnackbarIssue(deletedIssue);
+        setSnackbarMessage("Issue moved to trash.");
+        setSnackbarVisible(true);
+      }
     } catch (err: any) {
       const apiErr = err as ApiError;
       setError(apiErr.message || "Failed to delete issue");
@@ -92,8 +94,8 @@ export default function DashboardHome() {
   };
 
   const handleUndo = async () => {
-    if (!snackbarIssue || !accessToken) return;
-
+    if (!snackbarIssue) return;
+    console.log(snackbarIssue)
     try {
       const res = await apiFetch<{ message: string; issue: NewsletterIssue }>(
         `/newsletters/${snackbarIssue.id}/restore`,

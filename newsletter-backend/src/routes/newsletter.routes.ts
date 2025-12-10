@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   createNewsletter,
-  deleteMyNewsletter,
   getMyNewsletterById,
   listMyNewsletters,
   updateMyNewsletter,
@@ -18,8 +17,6 @@ newsletterRouter.get("/", listMyNewsletters);
 newsletterRouter.post("/", createNewsletter);
 newsletterRouter.get("/:id", getMyNewsletterById);
 newsletterRouter.put("/:id", updateMyNewsletter);
-newsletterRouter.delete("/:id", deleteMyNewsletter);
-
 newsletterRouter.post("/:id/publish", publishNewsletter);
 newsletterRouter.delete("/:id", softDeleteNewsletter);
 newsletterRouter.post("/:id/restore", restoreNewsletter);
