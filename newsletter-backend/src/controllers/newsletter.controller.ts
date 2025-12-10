@@ -19,30 +19,6 @@ async function getCreatorIdForUser(userId: string) {
   return profile?.id ?? null;
 }
 
-// // Ensure slug uniqueness per creator
-// async function generateUniqueSlug(creatorId: string, title: string): Promise<string> {
-//   const base = slugify(title || "untitled");
-//   if (!base) {
-//     return `issue-${Date.now()}`;
-//   }
-
-//   let slug = base;
-//   let counter = 2;
-
-//   while (true) {
-//     const existing = await prisma.newsletterIssue.findFirst({
-//       where: { creatorId, slug },
-//       select: { id: true },
-//     });
-
-//     if (!existing) {
-//       return slug;
-//     }
-
-//     slug = `${base}-${counter++}`;
-//   }
-// }
-
 export const listMyNewsletters = async (
   req: AuthRequest,
   res: Response,
@@ -183,10 +159,7 @@ export const updateMyNewsletter = async (
   }
 };
 
-/**
- * DELETE /api/v1/newsletters/:id
- * Soft delete: set deletedAt, keep row for analytics / training etc.
- */
+
 export const softDeleteNewsletter = async (
   req: AuthRequest,
   res: Response,
@@ -234,10 +207,6 @@ export const softDeleteNewsletter = async (
   }
 };
 
-/**
- * POST /api/v1/newsletters/:id/restore
- * Restore a soft-deleted issue.
- */
 export const restoreNewsletter = async (
   req: AuthRequest,
   res: Response,
