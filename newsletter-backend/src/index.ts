@@ -30,7 +30,6 @@ app.use("/api", subscriptionRouter);
 app.use("/api/v1/creators", creatorsRouter); 
 app.use("/api/v1/timeline", timelineRouter);   // GET /api/timeline
 app.use("/api/v1/ai", aiRouter);               // AI endpoints
-
 // Global error handler (basic)
 app.use(
   (

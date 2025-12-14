@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiError } from "@/lib/apiClient";
 import { CreatorProfile } from "@/types/creator";
-
+import { API_BASE_URL } from "@/lib/config";
 export default function ProfilePage() {
   const { accessToken } = useAuth();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
@@ -18,6 +18,41 @@ export default function ProfilePage() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [niche, setNiche] = useState("");
+  const [handleStatus, setHandleStatus] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid" | "error"
+  >("idle");
+
+  useEffect(() => {
+    const h = handle.trim().toLowerCase();
+
+    if (!h) {
+      setHandleStatus("idle");
+      return;
+    }
+
+    if (!/^[a-z0-9_]{3,30}$/.test(h)) {
+      setHandleStatus("invalid");
+      return;
+    }
+
+    setHandleStatus("checking");
+
+    const t = setTimeout(async () => {
+      try {
+        const currentHandle = profile?.handle ? `&currentHandle=${encodeURIComponent(profile.handle)}` : "";
+        const data = await apiFetch<{ available: boolean }>(
+          `/public/creators/slug-available?handle=${encodeURIComponent(h)}${currentHandle}`
+        );
+
+        setHandleStatus(data.available ? "available" : "taken");
+      } catch {
+        setHandleStatus("error");
+      }
+    }, 500);
+
+    return () => clearTimeout(t);
+  }, [handle, profile?.handle]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -64,14 +99,26 @@ export default function ProfilePage() {
     setSaving(true);
     setError(null);
     setSuccess(null);
+    const normalized = handle.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,30}$/.test(normalized)) {
+      setError("Handle must be 3–30 chars (a–z, 0–9, underscore).");
+      setSaving(false);
+      return;
+    }
 
+    if (handleStatus !== "available") {
+      setError("Please choose an available handle before saving.");
+      setSaving(false);
+      return;
+    }
     const payload = {
-      handle,
+      handle: normalized,
       displayName,
-      bio: bio || undefined,
-      avatarUrl: avatarUrl || undefined,
-      niche: niche || undefined,
+      bio: bio ? bio : null,
+      avatarUrl: avatarUrl ? avatarUrl : null,
+      niche: niche ? niche : null,
     };
+
 
     try {
       let result: CreatorProfile;
@@ -166,7 +213,7 @@ export default function ProfilePage() {
                       type="text"
                       className="flex-1 bg-transparent text-sm font-light focus:outline-none placeholder:text-neutral-400"
                       value={handle}
-                      onChange={(e) => setHandle(e.target.value)}
+                      onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/\s+/g, ""))}
                       required
                       placeholder="yourname"
                     />
@@ -174,6 +221,16 @@ export default function ProfilePage() {
                   <p className="text-xs text-neutral-500 font-light mt-2">
                     Your public URL: <code className="bg-neutral-100 px-1.5 py-0.5 rounded">/{handle || "yourname"}</code>
                   </p>
+                  <div className="mt-2 text-xs font-light">
+                    {handleStatus === "checking" && <span className="text-neutral-500">Checking availability...</span>}
+                    {handleStatus === "available" && <span className="text-green-600">✅ Handle is available</span>}
+                    {handleStatus === "taken" && <span className="text-red-600">❌ Handle is taken</span>}
+                    {handleStatus === "invalid" && (
+                      <span className="text-red-600">Handle must be 3–30 chars (a–z, 0–9, underscore)</span>
+                    )}
+                    {handleStatus === "error" && <span className="text-red-600">Couldn’t check handle</span>}
+                  </div>
+
                 </div>
 
                 <div>
@@ -238,7 +295,7 @@ export default function ProfilePage() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || handleStatus === "checking" || handleStatus === "taken" || handleStatus === "invalid"}
                     className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-light hover:shadow-lg hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all"
                   >
                     {saving

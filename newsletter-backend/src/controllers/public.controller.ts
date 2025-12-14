@@ -185,10 +185,11 @@ export const checkHandleAvailable = async (
 ) => {
   try {
     const handleRaw = String(req.query.handle || "").trim();
-
     if (!handleRaw) {
       return res.status(400).json({ available: false, reason: "missing" });
     }
+    const currentHandleRaw = String(req.query.currentHandle || "").trim();
+    const currentHandle = currentHandleRaw ? currentHandleRaw.toLowerCase() : null;
 
     const handle = handleRaw.toLowerCase();
 
@@ -196,7 +197,6 @@ export const checkHandleAvailable = async (
       return res.status(200).json({ available: false, reason: "invalid" });
     }
 
-    // (optional) reserve system routes
     const reserved = new Set([
       "login",
       "register",
@@ -209,7 +209,10 @@ export const checkHandleAvailable = async (
     if (reserved.has(handle)) {
       return res.status(200).json({ available: false, reason: "reserved" });
     }
-
+       
+    if (currentHandle && currentHandle === handle) {
+      return res.json({ available: true });
+    }
     const exists = await prisma.creatorProfile.findUnique({
       where: { handle },
       select: { id: true },

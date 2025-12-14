@@ -6,8 +6,7 @@ import {
 } from "../controllers/public.controller";
 
 export const publicRouter = Router();
-
+publicRouter.get("/creators/slug-available", checkHandleAvailable);
 publicRouter.get("/creators/:handle", getPublicCreator);
 publicRouter.get("/creators/:handle/issues", getPublicCreatorIssues);
 publicRouter.get("/creators/:handle/issues/:slug", getPublicIssueByHandleAndSlug);
-publicRouter.get("/creators/slug-available", checkHandleAvailable);
