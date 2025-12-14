@@ -174,7 +174,49 @@ export const getPublicCreatorIssues = async (
       items: issues,
     });
   } catch (err) {
-    // let your global error middleware handle it
+    next(err);
+  }
+};
+
+export const checkHandleAvailable = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const handleRaw = String(req.query.handle || "").trim();
+
+    if (!handleRaw) {
+      return res.status(400).json({ available: false, reason: "missing" });
+    }
+
+    const handle = handleRaw.toLowerCase();
+
+    if (!/^[a-z0-9_]{3,30}$/.test(handle)) {
+      return res.status(200).json({ available: false, reason: "invalid" });
+    }
+
+    // (optional) reserve system routes
+    const reserved = new Set([
+      "login",
+      "register",
+      "dashboard",
+      "api",
+      "unsubscribe",
+      "terms",
+      "privacy",
+    ]);
+    if (reserved.has(handle)) {
+      return res.status(200).json({ available: false, reason: "reserved" });
+    }
+
+    const exists = await prisma.creatorProfile.findUnique({
+      where: { handle },
+      select: { id: true },
+    });
+
+    return res.json({ available: !exists });
+  } catch (err) {
     next(err);
   }
 };
