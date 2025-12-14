@@ -13,15 +13,30 @@ export const getMyCreatorProfile = async (
 ) => {
   try {
     const userId = req.user?.id!;
-    const profile = await prisma.creatorProfile.findUnique({
+     const creator = await prisma.creatorProfile.findUnique({
       where: { userId },
+      include: {
+        _count: {
+          select: {
+            followers: true,   // people who follow you
+            subscribers: true,
+            newsletters: true,
+          },
+        },
+      },
     });
 
-    if (!profile) {
+    if (!creator) {
       return res.status(404).json({ message: "Creator profile not found" });
     }
+    const followingCount = await prisma.follow.count({
+      where: { followerId: userId },
+    });
 
-    res.json(profile);
+    res.json({
+      ...creator,
+      followingCount,
+    });
   } catch (err) {
     next(err);
   }
@@ -115,7 +130,7 @@ export const getCreatorByHandle = async (
   next: NextFunction
 ) => {
   try {
-    const { handle } = req.params as { handle: string }; // 👈 tell TS it's string
+    const { handle } = req.params as { handle: string }; 
 
     if (!handle) {
       return res.status(400).json({ message: "Creator handle is required" });
@@ -142,6 +157,119 @@ export const getCreatorByHandle = async (
     }
 
     res.json(creator);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listMyFollowers = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user!.id;
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
+    const pageSize = Math.min(50, Math.max(1, parseInt(String(req.query.pageSize ?? "20"), 10)));
+
+    const me = await prisma.creatorProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!me) {
+      return res.status(404).json({ message: "Creator profile not found" });
+    }
+
+    const [total, rows] = await Promise.all([
+      prisma.follow.count({
+        where: { creatorId: me.id },
+      }),
+      prisma.follow.findMany({
+        where: { creatorId: me.id },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          follower: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              creatorProfile: {
+                select: {
+                  handle: true,
+                  displayName: true,
+                  avatarUrl: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const items = rows.map((r) => ({
+      userId: r.follower.id,
+      displayName:
+        r.follower.creatorProfile?.displayName ??
+        r.follower.name ??
+        "Unknown",
+      handle: r.follower.creatorProfile?.handle ?? null,
+      avatarUrl:
+        r.follower.creatorProfile?.avatarUrl ??
+        r.follower.image ??
+        null,
+      followedAt: r.createdAt,
+    }));
+
+    res.json({ page, pageSize, total, items });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listMyFollowing = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user!.id;
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
+    const pageSize = Math.min(50, Math.max(1, parseInt(String(req.query.pageSize ?? "20"), 10)));
+
+    const [total, rows] = await Promise.all([
+      prisma.follow.count({
+        where: { followerId: userId },
+      }),
+      prisma.follow.findMany({
+        where: { followerId: userId },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          creator: {
+            select: {
+              id: true,
+              handle: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const items = rows.map((r) => ({
+      creatorId: r.creator.id,
+      handle: r.creator.handle,
+      displayName: r.creator.displayName,
+      avatarUrl: r.creator.avatarUrl,
+      followedAt: r.createdAt,
+    }));
+
+    res.json({ page, pageSize, total, items });
   } catch (err) {
     next(err);
   }

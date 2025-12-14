@@ -8,6 +8,8 @@ export interface CreatorProfile {
   niche?: string | null;
   createdAt: string;
   updatedAt: string;
+  followingCount? : number
+  _count?: CreatorPublicCounts;
 }
 
 export type IssueStatus = "DRAFT" | "PUBLISHED";
@@ -41,7 +43,7 @@ export interface CreatorPublic extends CreatorProfile {
     image?: string | null;
   } | null;
   _count: CreatorPublicCounts;
-  isFollowing?: boolean; // optional, used later by Follow button
+  isFollowing?: boolean; 
 }
 
 export interface PublicIssueSummary {

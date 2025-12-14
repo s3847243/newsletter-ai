@@ -4,7 +4,38 @@ import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiError } from "@/lib/apiClient";
 import { CreatorProfile } from "@/types/creator";
-import { API_BASE_URL } from "@/lib/config";
+type FollowListItem = {
+  userId?: string;
+  creatorId?: string;
+  handle: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  followedAt: string;
+};
+export interface FollowUserListItem {
+  userId: string;
+  displayName: string;
+  handle: string | null;      
+  avatarUrl: string | null;
+  followedAt: string;
+}
+
+export interface FollowCreatorListItem {
+  creatorId: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  followedAt: string;
+}
+
+export interface PaginatedResponse<T> {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: T[];
+}
+
+
 export default function ProfilePage() {
   const { accessToken } = useAuth();
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
@@ -21,6 +52,10 @@ export default function ProfilePage() {
   const [handleStatus, setHandleStatus] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid" | "error"
   >("idle");
+  const [followModalOpen, setFollowModalOpen] = useState(false);
+  const [followModalType, setFollowModalType] = useState<"followers" | "following">("followers");
+  const [followItems, setFollowItems] = useState<FollowListItem[]>([]);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     const h = handle.trim().toLowerCase();
@@ -154,6 +189,31 @@ export default function ProfilePage() {
       </div>
     );
   }
+  const openFollowers = async () => {
+  setFollowModalType("followers");
+  setFollowModalOpen(true);
+  await loadFollowList("followers");
+  };
+
+  const openFollowing = async () => {
+    setFollowModalType("following");
+    setFollowModalOpen(true);
+    await loadFollowList("following");
+  };
+
+  const loadFollowList = async (type: "followers" | "following") => {
+    if (!accessToken) return;
+    setFollowLoading(true);
+    try {
+      const data = await apiFetch<{ items: FollowListItem[] }>(
+        `/creator-profile/me/${type}?page=1&pageSize=50`,
+        {}
+      );
+      setFollowItems(data.items);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   const hasProfile = !!profile;
 
@@ -376,9 +436,89 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => openFollowers()}
+                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-left hover:bg-neutral-100 cursor-pointer"
+                >
+                  <div className="text-lg font-medium text-neutral-900">
+                    {profile?._count?.followers ?? 0}
+                  </div>
+                  <div className="text-xs text-neutral-500 font-light">Followers</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openFollowing()}
+                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-left hover:bg-neutral-100 cursor-pointer"
+                >
+                  <div className="text-lg font-medium text-neutral-900">
+                    {profile?.followingCount ?? 0}
+                  </div>
+                  <div className="text-xs text-neutral-500 font-light">Following</div>
+                </button>
+              </div>
+
           </div>
         </div>
       </div>
+      {followModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="w-full max-w-lg rounded-2xl bg-white border border-neutral-200 shadow-xl">
+      <div className="flex items-center justify-between px-5 py-4 border-b">
+        <h3 className="text-sm font-medium">
+          {followModalType === "followers" ? "Followers" : "Following"}
+        </h3>
+        <button
+          onClick={() => setFollowModalOpen(false)}
+          className="text-neutral-500 hover:text-neutral-900"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="p-5 max-h-[60vh] overflow-auto">
+        {followLoading ? (
+          <p className="text-sm text-neutral-500">Loading...</p>
+        ) : followItems.length === 0 ? (
+          <p className="text-sm text-neutral-500">Nothing here yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {followItems.map((it, idx) => (
+              <div key={idx} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {it.avatarUrl ? (
+                    <img src={it.avatarUrl} className="h-9 w-9 rounded-full object-cover" />
+                  ) : (
+                    <div className="h-9 w-9 rounded-full bg-neutral-200" />
+                  )}
+
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{it.displayName}</div>
+                    {it.handle && (
+                      <div className="text-xs text-neutral-500 truncate">@{it.handle}</div>
+                    )}
+                  </div>
+                </div>
+
+                {it.handle && (
+                  <a
+                    href={`/${it.handle}`}
+                    className="text-xs text-indigo-600 hover:underline"
+                  >
+                    View
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
