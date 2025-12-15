@@ -273,7 +273,7 @@ export default function DashboardHome() {
 
                         {issue.status === "PUBLISHED" && (
                           <Link
-                            href={`/${issue.creatorId}/${issue.slug}`}
+                            href={`/${issue.creator?.handle}/${issue.slug}`}
                             target="_blank"
                             className="text-sm text-neutral-600 hover:text-neutral-900 font-light transition-colors"
                           >
@@ -298,7 +298,6 @@ export default function DashboardHome() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl space-y-4">

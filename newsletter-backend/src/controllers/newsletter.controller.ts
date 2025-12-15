@@ -35,6 +35,15 @@ export const listMyNewsletters = async (
     const issues = await prisma.newsletterIssue.findMany({
       where: { creatorId,deletedAt: null, },
       orderBy: { createdAt: "desc" },
+      select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          publishedAt: true,
+          viewCount: true,
+          creator: { select: { handle: true } }, 
+      },
     });
 
     res.json(issues);

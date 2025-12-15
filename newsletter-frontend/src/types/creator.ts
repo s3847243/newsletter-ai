@@ -27,6 +27,8 @@ export interface NewsletterIssue {
   emailIntro?: string | null;
   createdAt: string;
   updatedAt: string;
+  creator?: { handle: string };
+
 }
 
 
