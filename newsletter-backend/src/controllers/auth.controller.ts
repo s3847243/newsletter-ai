@@ -1,11 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
 import { env } from "../config/env";
 import { loginSchema, registerSchema } from "../routes/auth.schemas";
 import { signAccessToken,signRefreshToken, verifyRefreshToken, } from "../lib/jwt";
-
+import { TransactionalEmail } from "../services/transactionalEmail.service";
+import { buildVerifyEmailHtml } from "../services/verifyEmail";
+import { generateRawToken, hashToken } from "../utils/tokens";
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = registerSchema.parse(req.body);
@@ -33,8 +34,25 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     const accessToken = signAccessToken({ id: user.id, email: user.email });
     const refreshToken = signRefreshToken({ id: user.id, email: user.email });
+    const raw = generateRawToken();
+    const tokenHash = hashToken(raw);
+    const expires = new Date(Date.now() + 1000 * 60 * 30);
 
-    res.status(201).json({
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifyTokenHash: tokenHash,
+        emailVerifyTokenExpiresAt: expires,
+      },
+    });
+
+    const verifyUrl = `${env.sitePublicUrl}/verify-email?token=${raw}`;
+    await TransactionalEmail.send({
+      to: user.email,
+      subject: "Verify your email",
+      html: buildVerifyEmailHtml({ verifyUrl }),
+    });
+    res.status(201).json({  
       user,
       accessToken,
       refreshToken,
@@ -125,6 +143,75 @@ export const refreshTokenHandler = async (
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+export const resendVerifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const emailRaw = String(req.body?.email || "").trim().toLowerCase();
+    if (!emailRaw) return res.status(400).json({ message: "Email is required" });
+
+    // IMPORTANT: don't reveal if email exists
+    const user = await prisma.user.findUnique({ where: { email: emailRaw } });
+
+    if (!user || user.emailVerifiedAt) {
+      return res.status(200).json({ message: "If an account exists, we sent a verification email." });
+    }
+
+    const raw = generateRawToken();
+    const tokenHash = hashToken(raw);
+    const expires = new Date(Date.now() + 1000 * 60 * 30); // 30 min
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifyTokenHash: tokenHash,
+        emailVerifyTokenExpiresAt: expires,
+      },
+    });
+
+    const verifyUrl = `${env.sitePublicUrl}/verify-email?token=${raw}`;
+    await TransactionalEmail.send({
+      to: user.email,
+      subject: "Verify your email",
+      html: buildVerifyEmailHtml({ verifyUrl }),
+    });
+
+    return res.status(200).json({ message: "If an account exists, we sent a verification email." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tokenRaw = String(req.body?.token || "").trim();
+    if (!tokenRaw) return res.status(400).json({ message: "Token is required" });
+
+    const tokenHash = hashToken(tokenRaw);
+
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerifyTokenHash: tokenHash,
+        emailVerifyTokenExpiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired verification link" });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerifyTokenHash: null,
+        emailVerifyTokenExpiresAt: null,
+      },
+    });
+
+    return res.json({ success: true });
   } catch (err) {
     next(err);
   }

@@ -23,6 +23,9 @@ model User {
   googleId       String?          @unique
   resetTokenHash String?
   resetTokenExp  DateTime?
+  emailVerifiedAt  DateTime?
+  emailVerifyTokenHash String?
+  emailVerifyTokenExpiresAt DateTime?
   creatorProfile CreatorProfile?
   follows        Follow[]         @relation("UserFollows")
   aiSuggestions  AiSuggestion[]
