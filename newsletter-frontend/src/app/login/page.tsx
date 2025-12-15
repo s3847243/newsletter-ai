@@ -3,7 +3,7 @@
 import { FormEvent, useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-
+import { apiFetch } from "@/lib/apiClient";
 export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const router = useRouter();
@@ -11,6 +11,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
@@ -26,10 +29,27 @@ export default function LoginPage() {
       await login(email, password);
     } catch (err: any) {
       setError(err.message || "Failed to login");
+      setShowResend(err.code === "EMAIL_NOT_VERIFIED");
     } finally {
       setSubmitting(false);
+      
     }
   };
+  const resendVerify = async () => {
+  setResendLoading(true);
+  setResendMsg(null);
+  try {
+    await apiFetch("/auth/resend-verify-email", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    setResendMsg("If that account exists, we sent a verification email.");
+  } catch (e: any) {
+    setResendMsg(e?.message || "Failed to resend verification email.");
+  } finally {
+    setResendLoading(false);
+  }
+};
 
   if (loading) {
     return (
@@ -52,6 +72,19 @@ export default function LoginPage() {
         {error && (
           <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded p-2">
             {error}
+          </div>
+        )}
+        {showResend && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={resendVerify}
+              disabled={!email || resendLoading}
+              className="w-full py-2 rounded border text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
+            >
+              {resendLoading ? "Sending..." : "Resend verification email"}
+            </button>
+            {resendMsg && <p className="text-xs text-gray-600">{resendMsg}</p>}
           </div>
         )}
 
