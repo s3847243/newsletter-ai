@@ -14,4 +14,10 @@ export const env = {
   sitePublicUrl: process.env.SITE_PUBLIC_URL!,
   openaiApiKey: process.env.OPENAI_API_KEY!,
   openaiModel: process.env.OPENAI_MODEL || "gpt-5-nano",
+  smtpHost: process.env.SMTP_HOST!,
+  smtpPort: process.env.SMTP_PORT!,
+  smtpSecure: process.env.SMTP_SECURE || "false",
+  smtpUser: process.env.SMTP_USER!,
+  smtpPass: process.env.SMTP_PASS!,
+  smtpFrom: process.env.SMTP_FROM!,
 };
