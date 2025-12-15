@@ -111,6 +111,15 @@ export default function LoginPage() {
               required
               autoComplete="current-password"
             />
+            <div className="flex items-center justify-between">
+              <span />
+              <a
+                href="/forgot-password"
+                className="text-xs text-indigo-600 hover:underline"
+              >
+                Forgot password?
+              </a>
+            </div>
           </div>
 
           <button
