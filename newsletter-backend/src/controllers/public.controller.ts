@@ -1,43 +1,38 @@
 import type { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { IssueStatus } from "../generated/prisma/enums";
-export const getPublicCreator = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+export const getPublicCreator = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { handle } = req.params as { handle: string };
 
-    if (!handle) {
-      return res.status(400).json({ message: "Creator handle is required" });
-    }
-
     const creator = await prisma.creatorProfile.findUnique({
-      where: { handle }, // now typed as string ✅
+      where: { handle },
       include: {
-        user: {
-          select: { name: true, image: true },
-        },
+        user: { select: { id: true, name: true, image: true } },
         _count: {
           select: {
             followers: true,
-            subscribers: true,
             newsletters: true,
           },
         },
       },
     });
 
-    if (!creator) {
-      return res.status(404).json({ message: "Creator not found" });
-    }
+    if (!creator) return res.status(404).json({ message: "Creator not found" });
 
-    res.json(creator);
+    const followingCount = await prisma.follow.count({
+      where: { followerId: creator.userId },
+    });
+
+    return res.json({
+      ...creator, 
+      followingCount,
+    });
   } catch (err) {
     next(err);
   }
 };
+
 
 export const getPublicIssueByHandleAndSlug = async (
   req: Request,
