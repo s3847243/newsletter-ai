@@ -21,7 +21,8 @@ model User {
   name           String?
   image          String?
   googleId       String?          @unique
-
+  resetTokenHash String?
+  resetTokenExp  DateTime?
   creatorProfile CreatorProfile?
   follows        Follow[]         @relation("UserFollows")
   aiSuggestions  AiSuggestion[]
