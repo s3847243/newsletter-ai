@@ -51,73 +51,6 @@ async function refreshTokens() {
   return data.accessToken as string;
 }
 
-// // Main apiFetch with auto-refresh
-// export async function apiFetch<T>(
-//   path: string,
-//   options: RequestInit = {},
-//   accessTokenOverride?: string,
-//   retry = true
-// ): Promise<T> {
-//   const token = accessTokenOverride ?? currentAccessToken;
-
-//   const headers: HeadersInit = {
-//     "Content-Type": "application/json",
-    
-//   };
-
-//   if (token && headers) {
-//     headers["Authorization"] = `Bearer ${token}`;
-//   }
-
-
-//   const res = await fetch(`${API_BASE_URL}${path}`, {
-//     ...options,
-//     headers,
-//   });
-
-//   // If access token expired, try refreshing once
-//   if (res.status === 401 && retry && currentRefreshToken) {
-//     const refreshed = await refreshTokens();
-
-//     if (refreshed?.accessToken) {
-//       // Retry original request with new token, but don't loop forever
-//       return apiFetch<T>(path, options, refreshed.accessToken, false);
-//     }
-//   }
-//     // 🔹 Special case: 204 No Content → no body, nothing to parse
-//   if (res.status === 204) {
-//     if (!res.ok) {
-//       throw new ApiError(res.statusText || "Request failed", res.status, null);
-//     }
-//     // Return null/undefined depending on preference
-//     return null as T;
-//   }
-//   if (!res.ok) {
-//     const errorBody = await res.text();
-//     let data: any = null;
-
-//     if (errorBody.trim().length > 0) {
-//       try {
-//         data = JSON.parse(errorBody);
-//       } catch (e) {
-//         // Not valid JSON – leave as raw text or null
-//         data = errorBody;
-//       }
-//     }
-
-//     let message = "Request failed";
-//     try {
-//       const parsed = JSON.parse(errorBody);
-//       if (parsed?.message) message = parsed.message;
-//     } catch {
-//       // ignore
-//     }
-
-//     throw new ApiError(message, res.status, data);
-//   }
-//   console.log(res)
-//   return res.json() as Promise<T>;
-// }
 async function internalFetch<T>(
   path: string,
   options: RequestInit,
@@ -125,10 +58,17 @@ async function internalFetch<T>(
 ): Promise<T> {
   const { accessToken } = loadAuth();
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string> || {}),
+ const isFormData = options.body instanceof FormData;
+
+  // Build headers as a plain object so we can safely assign keys
+  const headers: Record<string, string> = {
+    ...((options.headers as Record<string, string>) || {}),
   };
+
+  // Only set JSON content-type when NOT uploading FormData
+  if (!isFormData && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`;

@@ -180,8 +180,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </svg>
           </button>
         </div>
-
-        <div className="p-6 lg:p-12">{children}</div>
+          {children}
       </main>
     </div>
   );
