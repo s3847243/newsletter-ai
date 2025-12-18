@@ -10,6 +10,8 @@ import { subscriptionRouter } from "./routes/subscription.routes";
 import { creatorsRouter } from "./routes/creators.routes";
 import { timelineRouter } from "./routes/timeline.routes";
 import { aiRouter } from "./routes/ai.routes";
+import { uploadRouter } from "./routes/upload.routes";
+
 const app = express();
 
 app.use(cors({ origin: "*", credentials: false }));
@@ -30,6 +32,9 @@ app.use("/api", subscriptionRouter);
 app.use("/api/v1/creators", creatorsRouter); 
 app.use("/api/v1/timeline", timelineRouter);   // GET /api/timeline
 app.use("/api/v1/ai", aiRouter);               // AI endpoints
+
+app.use("/api/v1/upload", uploadRouter);
+
 // Global error handler (basic)
 app.use(
   (

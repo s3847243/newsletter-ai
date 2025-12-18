@@ -20,4 +20,13 @@ export const env = {
   smtpUser: process.env.SMTP_USER!,
   smtpPass: process.env.SMTP_PASS!,
   smtpFrom: process.env.SMTP_FROM!,
+  awsRegion:  process.env.AWS_REGION!,
+  awsAccessKeyId:
+    process.env.AWS_ACCESS_KEY_ID!,
+  awsSecretAccessKey: 
+    process.env.AWS_SECRET_ACCESS_KEY!,
+  s3BucketName:
+    process.env.S3_BUCKET_NAME!,
+    s3PublicBaseUrl:
+    process.env.S3_PUBLIC_BASE_URL!
 };
