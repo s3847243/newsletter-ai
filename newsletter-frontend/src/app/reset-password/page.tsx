@@ -8,7 +8,7 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const sp = useSearchParams();
   const token = useMemo(() => sp.get("token") || "", [sp]);
-
+  const email = useMemo(()=> sp.get("email") ||"",[sp])
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
     try {
       await apiFetch("/auth/reset-password", {
         method: "POST",
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, newPassword: password, email }),
       });
       setDone(true);
       setTimeout(() => router.push("/login"), 800);

@@ -30,12 +30,11 @@ app.use("/api/v1/newsletters", newsletterRouter);
 app.use("/api/v1/public", publicRouter);
 app.use("/api", subscriptionRouter);       
 app.use("/api/v1/creators", creatorsRouter); 
-app.use("/api/v1/timeline", timelineRouter);   // GET /api/timeline
-app.use("/api/v1/ai", aiRouter);               // AI endpoints
+app.use("/api/v1/timeline", timelineRouter);  
+app.use("/api/v1/ai", aiRouter);              
 
 app.use("/api/v1/upload", uploadRouter);
 
-// Global error handler (basic)
 app.use(
   (
     err: any,

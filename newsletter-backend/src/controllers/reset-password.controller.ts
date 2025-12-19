@@ -11,12 +11,10 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const emailRaw = String(req.body?.email || "").trim().toLowerCase();
     const token = String(req.body?.token || "").trim();
     const newPassword = String(req.body?.newPassword || "");
-
+    console.log(newPassword  )
     if (!emailRaw || !token || !newPassword) {
+
       return res.status(400).json({ message: "Missing fields" });
-    }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
 
     const user = await prisma.user.findUnique({

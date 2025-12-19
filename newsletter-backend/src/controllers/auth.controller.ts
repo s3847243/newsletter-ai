@@ -52,10 +52,10 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       subject: "Verify your email",
       html: buildVerifyEmailHtml({ verifyUrl }),
     });
-    res.status(201).json({  
+    return res.status(201).json({
+      message: "Account created. Please verify your email to log in.",
+      code: "EMAIL_VERIFICATION_REQUIRED",
       user,
-      accessToken,
-      refreshToken,
     });
   } catch (err) {
     next(err);
@@ -123,11 +123,14 @@ export const refreshTokenHandler = async (
 
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, emailVerifiedAt: true },
     });
 
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
+    if (!user || !user.emailVerifiedAt) {
+      return res.status(403).json({
+        message: "Please verify your email before continuing.",
+        code: "EMAIL_NOT_VERIFIED",
+      });
     }
 
     const newAccessToken = signAccessToken({
@@ -158,7 +161,6 @@ export const resendVerifyEmail = async (req: Request, res: Response, next: NextF
     const emailRaw = String(req.body?.email || "").trim().toLowerCase();
     if (!emailRaw) return res.status(400).json({ message: "Email is required" });
 
-    // IMPORTANT: don't reveal if email exists
     const user = await prisma.user.findUnique({ where: { email: emailRaw } });
 
     if (!user || user.emailVerifiedAt) {

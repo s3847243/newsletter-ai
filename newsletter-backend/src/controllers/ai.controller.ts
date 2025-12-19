@@ -35,7 +35,6 @@ const BASE_SYSTEM_PROMPT = `
   - No surrounding backticks unless explicitly requested.
 `.trim();
 
-// 1) Generate full draft
 export const generateDraft = async (
   req: AuthRequest,
   res: Response,
@@ -82,8 +81,6 @@ Return ONLY HTML for the body content.
   }
 };
 
-
-// Helper to map rewrite modes to instructions
 function modeToInstruction(mode: string): string {
   switch (mode) {
     case "shorten":
@@ -99,9 +96,6 @@ function modeToInstruction(mode: string): string {
       return "Improve clarity, flow, and impact. You may lightly adjust tone and structure, but keep the meaning.";
   }
 }
-
-
-// 2) Rewrite selected text
 export const rewriteText = async (
   req: AuthRequest,
   res: Response,
@@ -135,9 +129,6 @@ ${input.text}
     next(err);
   }
 };
-
-
-// 3) Subject lines
 export const generateSubjectLines = async (
   req: AuthRequest,
   res: Response,
@@ -182,8 +173,6 @@ Each subject line:
   }
 };
 
-
-// 4) Copilot chat
 export const copilotChat = async (
   req: AuthRequest,
   res: Response,
@@ -194,7 +183,6 @@ export const copilotChat = async (
     const ctx = input.context || {};
     const authUserId = req.user?.id;
 
-    // Optional: pull creator profile for niche
     let creatorId: string | undefined;
     let niche: string | undefined;
 
@@ -237,8 +225,6 @@ export const copilotChat = async (
     })) as { role: "user" | "assistant"; content: string }[];
 
     const reply = await OpenAIService.chat(systemPrompt, messages);
-
-    // Store in DB as a suggestion for future fine-tuning
     const lastUserMessage = [...messages].reverse().find(
       (m) => m.role === "user"
     );

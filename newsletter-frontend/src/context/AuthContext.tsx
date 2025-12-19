@@ -1,5 +1,4 @@
 "use client";
-
 import {
   createContext,
   useCallback,
@@ -8,7 +7,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { apiFetch, setTokens } from "@/lib/apiClient"; // ⬅️ note setTokens import
+import { apiFetch, setTokens } from "@/lib/apiClient"; 
 import { AuthUser, AuthResponse } from "@/types/auth";
 import { clearAuth, loadAuth, saveAuth } from "@/lib/authStorage";
 import { useRouter } from "next/navigation";
@@ -34,20 +33,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // 🔹 Load from localStorage on mount
   useEffect(() => {
-    const stored = loadAuth(); // { user, accessToken, refreshToken } | empty
+    const stored = loadAuth(); 
     setUser(stored.user || null);
     setAccessToken(stored.accessToken || null);
     setRefreshToken(stored.refreshToken || null);
 
-    // keep apiClient's global tokens in sync
     setTokens(stored.accessToken || null, stored.refreshToken || null);
 
     setLoading(false);
   }, []);
 
-  // 🔹 Central place to update auth state + storage + apiClient
   const setAuth = useCallback((resp: AuthResponse) => {
     setUser(resp.user);
     setAccessToken(resp.accessToken);
@@ -60,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshToken: resp.refreshToken,
     });
 
-    // sync with apiClient for auto-refresh + Authorization header
     setTokens(resp.accessToken, resp.refreshToken);
   }, []);
 
@@ -85,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       setAuth(resp);
-      router.push("/dashboard");
+      router.push(`/verify-email/sent?email=${encodeURIComponent(email)}`);
     },
     [setAuth, router]
   );

@@ -6,7 +6,14 @@ import { API_BASE_URL } from "./config";
 // but this gives the structure.
 let currentAccessToken: string | null = null;
 let currentRefreshToken: string | null = null;
-
+function shouldSkipRefresh(path: string) {
+  return (
+    path.startsWith("/auth/login") ||
+    path.startsWith("/auth/register") ||
+    path.startsWith("/auth/refresh") ||
+    path.startsWith("/public/")
+  );
+}
 // Optionally export setters so AuthContext can keep them in sync
 export function setTokens(access: string | null, refresh: string | null) {
   currentAccessToken = access;
@@ -79,7 +86,10 @@ async function internalFetch<T>(
     headers,
   });
 
-  if (res.status === 401 && allowRetry) {
+  if (res.status === 401 &&
+    allowRetry &&
+    !shouldSkipRefresh(path) &&
+    !!accessToken) {
     try {
       const newAccessToken = await refreshTokens();
 
