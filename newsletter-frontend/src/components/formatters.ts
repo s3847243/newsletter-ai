@@ -1,4 +1,3 @@
-// components/editor/formatters.ts
 export const formatBold = () => {
   document.execCommand('bold', false);
 };
@@ -30,7 +29,6 @@ export const formatBackquote = () => {
   range.deleteContents();
   range.insertNode(code);
   
-  // Move cursor after the code element
   const newRange = document.createRange();
   newRange.setStartAfter(code);
   newRange.collapse(true);
@@ -45,7 +43,6 @@ export const formatCodeBlock = (editorRef: React.RefObject<HTMLDivElement | null
   const range = selection.getRangeAt(0);
   let node: Node | null = range.commonAncestorContainer;
   
-  // Check if already inside a code block
   while (node && node !== editorRef.current) {
     if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
@@ -53,7 +50,6 @@ export const formatCodeBlock = (editorRef: React.RefObject<HTMLDivElement | null
         alert('Already inside a code block');
         return;
       }
-      // Prevent code blocks in headings
       if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(el.tagName)) {
         alert('Cannot add code block inside a heading');
         return;
@@ -80,13 +76,11 @@ export const formatCodeBlock = (editorRef: React.RefObject<HTMLDivElement | null
   range.deleteContents();
   range.insertNode(pre);
   
-  // Add line breaks
   const br1 = document.createElement('br');
   const br2 = document.createElement('br');
   pre.parentNode?.insertBefore(br1, pre);
   pre.parentNode?.insertBefore(br2, pre.nextSibling);
   
-  // Place cursor inside
   const newRange = document.createRange();
   newRange.selectNodeContents(pre);
   newRange.collapse(false);
@@ -106,7 +100,6 @@ export const formatChecklist = (editorRef: React.RefObject<HTMLDivElement | null
   
   const range = selection.getRangeAt(0);
   
-  // Create checklist item
   const checklistItem = document.createElement('div');
   checklistItem.className = 'checklist-item';
   checklistItem.style.display = 'flex';

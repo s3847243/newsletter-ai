@@ -11,11 +11,9 @@ export function ImageResizer({ image, onClose }: ImageResizerProps) {
   const [width, setWidth] = useState(image.width || 600);
 
   useEffect(() => {
-    // Add border to show it's selected
     image.style.border = "2px solid #7c3aed";
 
     return () => {
-      // Cleanup when unmounted
       image.style.border = "";
     };
   }, [image]);

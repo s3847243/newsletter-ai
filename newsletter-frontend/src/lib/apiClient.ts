@@ -1,9 +1,6 @@
-// src/lib/apiClient.ts
 import { clearAuth, loadAuth, saveAuth } from "./authStorage";
 import { API_BASE_URL } from "./config";
 
-// You might want to inject these from context in a nicer way,
-// but this gives the structure.
 let currentAccessToken: string | null = null;
 let currentRefreshToken: string | null = null;
 function shouldSkipRefresh(path: string) {
@@ -14,7 +11,6 @@ function shouldSkipRefresh(path: string) {
     path.startsWith("/public/")
   );
 }
-// Optionally export setters so AuthContext can keep them in sync
 export function setTokens(access: string | null, refresh: string | null) {
   currentAccessToken = access;
   currentRefreshToken = refresh;
@@ -54,7 +50,6 @@ async function refreshTokens() {
   // currentRefreshToken = data.refreshToken;
   saveAuth(data);
 
-  // You should also update AuthContext here via a callback from outside.
   return data.accessToken as string;
 }
 
@@ -67,12 +62,10 @@ async function internalFetch<T>(
 
  const isFormData = options.body instanceof FormData;
 
-  // Build headers as a plain object so we can safely assign keys
   const headers: Record<string, string> = {
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  // Only set JSON content-type when NOT uploading FormData
   if (!isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }

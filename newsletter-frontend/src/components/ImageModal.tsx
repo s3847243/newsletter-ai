@@ -35,7 +35,6 @@ export function ImageModal({ editorRef, onClose, onImageInserted }: ImageModalPr
 
     const editor = editorRef.current;
 
-    // Create wrapper + img
     const wrapper = document.createElement("div");
     wrapper.className = "image-wrapper";
     wrapper.style.margin = "1em 0";
@@ -49,7 +48,6 @@ export function ImageModal({ editorRef, onClose, onImageInserted }: ImageModalPr
     img.style.cursor = "pointer";
     img.style.borderRadius = "8px";
 
-    // Add click handler for resizing
     img.addEventListener("click", (e) => {
       e.stopPropagation();
       if (onImageInserted) {
@@ -76,7 +74,6 @@ export function ImageModal({ editorRef, onClose, onImageInserted }: ImageModalPr
 
     if (!range) return;
 
-    // Find the block element for the caret
     let node: Node | null = range.startContainer;
     let block: HTMLElement | null = null;
 
@@ -97,12 +94,10 @@ export function ImageModal({ editorRef, onClose, onImageInserted }: ImageModalPr
       editor.appendChild(wrapper);
     }
 
-    // Add paragraph after
     const p = document.createElement("p");
     p.innerHTML = "<br>";
     wrapper.parentNode?.insertBefore(p, wrapper.nextSibling);
 
-    // Move cursor to new paragraph
     const newRange = document.createRange();
     newRange.setStart(p, 0);
     newRange.collapse(true);
@@ -110,7 +105,6 @@ export function ImageModal({ editorRef, onClose, onImageInserted }: ImageModalPr
     selection?.removeAllRanges();
     selection?.addRange(newRange);
 
-    // Close modal
     onClose();
     editor.focus();
   };

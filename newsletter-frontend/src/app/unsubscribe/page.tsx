@@ -15,7 +15,6 @@ async function getCreator(handle: string): Promise<CreatorPublic | null> {
   return (await res.json()) as CreatorPublic;
 }
 
-// we still don't list issues yet
 async function getRecentIssues(handle: string): Promise<NewsletterIssue[]> {
   return [];
 }

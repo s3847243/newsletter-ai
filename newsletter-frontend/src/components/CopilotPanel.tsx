@@ -44,7 +44,6 @@ export function CopilotPanel({ editorRef, title, onClose }: CopilotPanelProps) {
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [copilotLoading, setCopilotLoading] = useState(false);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     const messagesContainer = document.getElementById("copilot-messages");
     if (messagesContainer) {

@@ -5,7 +5,6 @@ import { Sparkles, Check, X, Loader2, Bold, Italic, List, Code, Link, Image } fr
 import { apiFetch } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { NewsletterIssue } from "@/types/creator";
-// Import modular components
 import { EditorToolbar } from "./EditorToolbar";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { CopilotPanel } from "./CopilotPanel";
