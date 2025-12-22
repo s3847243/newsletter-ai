@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiClient";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const sp = useSearchParams();
   const router = useRouter();
   const token = sp.get("token") || "";
@@ -31,5 +31,17 @@ export default function VerifyEmailPage() {
       {status === "ok" && <p>Email verified ✅ Redirecting…</p>}
       {status === "error" && <p>Invalid or expired link ❌</p>}
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <p>Loading…</p>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

@@ -1,14 +1,14 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/apiClient";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const token = useMemo(() => sp.get("token") || "", [sp]);
-  const email = useMemo(()=> sp.get("email") ||"",[sp])
+  const email = useMemo(() => sp.get("email") || "", [sp]);
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,5 +86,17 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

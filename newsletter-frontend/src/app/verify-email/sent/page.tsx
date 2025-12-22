@@ -1,10 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { apiFetch } from "@/lib/apiClient";
 
-export default function VerifyEmailSentPage() {
+function VerifyEmailContent() {
   const sp = useSearchParams();
   const email = sp.get("email") || "";
   const [loading, setLoading] = useState(false);
@@ -47,5 +47,17 @@ export default function VerifyEmailSentPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailSentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
