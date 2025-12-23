@@ -1,2 +1,2 @@
 export const API_BASE_URL =
-   "http://localhost:4000/api/v1";
+   "https://15-134-145-234.nip.io/api/v1";
