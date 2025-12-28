@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma";
 import { env } from "../config/env";
 import { loginSchema, registerSchema } from "../routes/auth.schemas";
-import { signAccessToken,signRefreshToken, verifyRefreshToken, } from "../lib/jwt";
+import { signAccessToken,signRefreshToken, verifyAccessToken, verifyRefreshToken, } from "../lib/jwt";
 import { TransactionalEmail } from "../services/transactionalEmail.service";
 import { buildVerifyEmailHtml } from "../services/verifyEmail";
 import { generateRawToken, hashToken } from "../utils/tokens";
@@ -246,4 +246,17 @@ export const logout = async (req: Request, res: Response) => {
     sameSite: isProd ? "none" : "lax",
   });
   return res.json({ ok: true });
+};
+
+export const me = async (req: Request, res: Response) => {
+  // You can read from access cookie and verify it
+  const token = req.cookies?.access_token;
+  if (!token) return res.status(401).json({ message: "Unauthenticated" });
+
+  try {
+    const payload = verifyAccessToken(token); // your verifier
+    return res.json({ email: payload.email, id: payload.sub });
+  } catch {
+    return res.status(401).json({ message: "Unauthenticated" });
+  }
 };
