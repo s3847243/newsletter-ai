@@ -11,10 +11,20 @@ import { creatorsRouter } from "./routes/creators.routes";
 import { timelineRouter } from "./routes/timeline.routes";
 import { aiRouter } from "./routes/ai.routes";
 import { uploadRouter } from "./routes/upload.routes";
+import cookieParser from "cookie-parser";
 
 const app = express();
+app.use(cookieParser());
 
-app.use(cors({ origin: "*", credentials: false }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://newsletter-ai-ashy.vercel.app",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(morgan("dev"));
 

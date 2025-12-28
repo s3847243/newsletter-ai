@@ -7,6 +7,7 @@ import { signAccessToken,signRefreshToken, verifyRefreshToken, } from "../lib/jw
 import { TransactionalEmail } from "../services/transactionalEmail.service";
 import { buildVerifyEmailHtml } from "../services/verifyEmail";
 import { generateRawToken, hashToken } from "../utils/tokens";
+import { setAuthCookies , clearAuthCookies} from "../utils/authCookies";
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = registerSchema.parse(req.body);
@@ -32,8 +33,6 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       },
     });
 
-    const accessToken = signAccessToken({ id: user.id, email: user.email });
-    const refreshToken = signRefreshToken({ id: user.id, email: user.email });
     const raw = generateRawToken();
     const tokenHash = hashToken(raw);
     const expires = new Date(Date.now() + 1000 * 60 * 30);
@@ -84,10 +83,17 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         code: "EMAIL_NOT_VERIFIED",
       });
     }
-
+    const isProd = env.nodeEnv === "production";
+    const cookieSecure = isProd;
+    const cookieSameSite = isProd ? "none" : "lax";
+    
     const accessToken = signAccessToken({ id: user.id, email: user.email });
     const refreshToken = signRefreshToken({ id: user.id, email: user.email });
-
+    setAuthCookies(res, accessToken, refreshToken, {
+      secure: cookieSecure,
+      sameSite: cookieSameSite,
+      
+    });
     res.json({
       user: {
         id: user.id,
@@ -142,7 +148,14 @@ export const refreshTokenHandler = async (
       id: user.id,
       email: user.email,
     });
+    const isProd = env.nodeEnv === "production";
+    const cookieSecure = isProd;
+    const cookieSameSite = isProd ? "none" : "lax";
 
+    setAuthCookies(res, newAccessToken, newRefreshToken, {
+      secure: cookieSecure,
+      sameSite: cookieSameSite,
+    });
     return res.json({
       user: {
         id: user.id,
@@ -223,4 +236,14 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
   } catch (err) {
     next(err);
   }
+};
+
+
+export const logout = async (req: Request, res: Response) => {
+  const isProd = env.nodeEnv === "production";
+  clearAuthCookies(res, {
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+  });
+  return res.json({ ok: true });
 };
