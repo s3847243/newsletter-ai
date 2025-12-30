@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Check, X, Loader2, Bold, Italic, List, Code, Link, Image } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/apiClient";
-import { useAuth } from "@/context/AuthContext";
 import { NewsletterIssue } from "@/types/creator";
 import { EditorToolbar } from "./EditorToolbar";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -39,7 +38,6 @@ export default function NotionStyleEditor({
   const [saving, setSaving] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const { accessToken } = useAuth();
   const [showCopilot, setShowCopilot] = useState(false);
 
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -140,7 +138,6 @@ export default function NotionStyleEditor({
 
   const uploadBase64Image = async (
     base64Data: string,
-    accessToken: string
   ): Promise<string> => {
     const blob = await base64ToBlob(base64Data);
     
@@ -179,7 +176,6 @@ export default function NotionStyleEditor({
 
   const uploadImagesToServer = async (
     htmlContent: string,
-    accessToken: string,
     onProgress?: (current: number, total: number) => void
   ): Promise<string> => {
     const parser = new DOMParser();
@@ -200,7 +196,7 @@ export default function NotionStyleEditor({
     }
 
     const uploadPromises = base64Images.map(async ({ src }, index) => {
-      const url = await uploadBase64Image(src, accessToken);
+      const url = await uploadBase64Image(src);
       if (onProgress) {
         onProgress(index + 1, base64Images.length);
       }
@@ -218,7 +214,7 @@ export default function NotionStyleEditor({
   };
 
   const handlePublish = async () => {
-    if (!accessToken || !editorRef.current) return;
+    if ( !editorRef.current) return;
 
     setSaving(true);
     let  htmlContent = editorRef.current.innerHTML || "";
@@ -232,7 +228,6 @@ export default function NotionStyleEditor({
 
       htmlContent = await uploadImagesToServer(
         htmlContent,
-        accessToken,
         (current, total) => {
           console.log(`Uploaded ${current}/${total} images`);
         }

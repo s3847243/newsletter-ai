@@ -7,16 +7,15 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { apiFetch, setTokens } from "@/lib/apiClient"; 
-import { AuthUser, AuthResponse } from "@/types/auth";
-import { clearAuth, loadAuth, saveAuth } from "@/lib/authStorage";
+import { apiFetch } from "@/lib/apiClient"; 
+import { AuthUser } from "@/types/auth";
 import { useRouter } from "next/navigation";
 
 interface AuthContextValue {
   user: AuthUser | null;
-  accessToken: string | null;
-  refreshToken: string | null;
-  setAuth: (resp: AuthResponse) => void;
+  // accessToken: string | null;
+  // refreshToken: string | null;
+  // setAuth: (resp: AuthResponse) => void;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -28,81 +27,90 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  // const [accessToken, setAccessToken] = useState<string | null>(null);
+  // const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const stored = loadAuth(); 
-    setUser(stored.user || null);
-    setAccessToken(stored.accessToken || null);
-    setRefreshToken(stored.refreshToken || null);
+  // useEffect(() => {
+  //   const stored = loadAuth(); 
+  //   setUser(stored.user || null);
+  //   setAccessToken(stored.accessToken || null);
+  //   setRefreshToken(stored.refreshToken || null);
 
-    setTokens(stored.accessToken || null, stored.refreshToken || null);
+  //   setTokens(stored.accessToken || null, stored.refreshToken || null);
 
-    setLoading(false);
+  //   setLoading(false);
+  // }, []);
+  const refreshMe = useCallback(async () => {
+    try {
+      const me = await apiFetch<AuthUser>("/auth/me", { method: "GET" });
+      setUser(me);
+    } catch (err) {
+      // not logged in
+      setUser(null);
+    }
   }, []);
+    useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await refreshMe();
+      setLoading(false);
+    })();
+  }, [refreshMe]);
 
-  const setAuth = useCallback((resp: AuthResponse) => {
-    setUser(resp.user);
-    setAccessToken(resp.accessToken);
-    setRefreshToken(resp.refreshToken);
+  // const setAuth = useCallback((resp: AuthResponse) => {
+  //   setUser(resp.user);
+  //   setAccessToken(resp.accessToken);
+  //   setRefreshToken(resp.refreshToken);
 
-    // persist
-    saveAuth({
-      user: resp.user,
-      accessToken: resp.accessToken,
-      refreshToken: resp.refreshToken,
-    });
+  //   // persist
+  //   saveAuth({
+  //     user: resp.user,
+  //     accessToken: resp.accessToken,
+  //     refreshToken: resp.refreshToken,
+  //   });
 
-    setTokens(resp.accessToken, resp.refreshToken);
-  }, []);
+  //   setTokens(resp.accessToken, resp.refreshToken);
+  // }, []);
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const resp = await apiFetch<AuthResponse>("/auth/login", {
+       // backend sets cookies
+      await apiFetch("/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
 
-      setAuth(resp);
+      await refreshMe();
       router.push("/dashboard");
     },
-    [setAuth, router]
+    [router, refreshMe]
   );
 
   const register = useCallback(
     async (name: string, email: string, password: string) => {
-      const resp = await apiFetch<AuthResponse>("/auth/register", {
+      await apiFetch("/auth/register", {
         method: "POST",
         body: JSON.stringify({ name, email, password }),
       });
-
-      setAuth(resp);
       router.push(`/verify-email/sent?email=${encodeURIComponent(email)}`);
     },
-    [setAuth, router]
+    [ router]
   );
 
-  const logout = useCallback(() => {
-    setUser(null);
-    setAccessToken(null);
-    setRefreshToken(null);
-    clearAuth();
-
-    // clear tokens in apiClient too
-    setTokens(null, null);
-
-    router.push("/login");
+  const logout = useCallback(async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } finally {
+      setUser(null);
+      router.push("/login");
+    }
   }, [router]);
 
   const value: AuthContextValue = {
     user,
-    accessToken,
-    refreshToken,
-    setAuth,
-    isAuthenticated: !!user && !!accessToken,
+    isAuthenticated: !!user ,
     loading,
     login,
     register,

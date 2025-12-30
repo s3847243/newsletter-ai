@@ -39,7 +39,6 @@ interface CopilotPanelProps {
 }
 
 export function CopilotPanel({ editorRef, title, onClose }: CopilotPanelProps) {
-  const { accessToken } = useAuth();
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([]);
   const [copilotLoading, setCopilotLoading] = useState(false);
@@ -107,7 +106,7 @@ export function CopilotPanel({ editorRef, title, onClose }: CopilotPanelProps) {
   const acceptSuggestion = async (message: CopilotMessage) => {
     if (!editorRef.current) return;
 
-    if (message.suggestionId && accessToken) {
+    if (message.suggestionId ) {
       try {
         await apiFetch<{ success: boolean; suggestion: any }>(
           `/ai/suggestions/${message.suggestionId}/accept`,
