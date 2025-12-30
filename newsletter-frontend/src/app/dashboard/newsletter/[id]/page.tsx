@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiError } from "@/lib/apiClient";
 import type { NewsletterIssue } from "@/types/creator";
 import NotionStyleEditor from "@/components/NotionStyleEditor";
@@ -10,14 +9,13 @@ import NotionStyleEditor from "@/components/NotionStyleEditor";
 export default function EditNewsletterPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
-  const { accessToken } = useAuth();
 
   const [issue, setIssue] = useState<NewsletterIssue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!accessToken || !id) return;
+    if ( !id) return;
 
     const load = async () => {
       setLoading(true);
@@ -39,7 +37,7 @@ export default function EditNewsletterPage() {
     };
 
     load();
-  }, [accessToken, id]);
+  }, [ id]);
 
   if (!id) {
     return (

@@ -14,7 +14,7 @@ export function FollowButton({
   creatorId,
   initialIsFollowing = false,
 }: FollowButtonProps) {
-  const { isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated } = useAuth();
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,7 @@ export function FollowButton({
   const handleClick = async () => {
     setError(null);
 
-    if (!isAuthenticated || !accessToken) {
+    if (!isAuthenticated ) {
       router.push("/login");
       return;
     }
