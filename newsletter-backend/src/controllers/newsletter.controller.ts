@@ -28,29 +28,31 @@ export const listMyNewsletters = async (
     const userId = req.user?.id!;
     const creatorId = await getCreatorIdForUser(userId);
 
+    // ✅ Dashboard should still work without a creator profile
     if (!creatorId) {
-      return res.status(400).json({ message: "You must create a creator profile first" });
+      return res.json([]);
     }
 
     const issues = await prisma.newsletterIssue.findMany({
-      where: { creatorId,deletedAt: null, },
+      where: { creatorId, deletedAt: null },
       orderBy: { createdAt: "desc" },
       select: {
-          id: true,
-          title: true,
-          slug: true,
-          status: true,
-          publishedAt: true,
-          viewCount: true,
-          creator: { select: { handle: true } }, 
+        id: true,
+        title: true,
+        slug: true,
+        status: true,
+        publishedAt: true,
+        viewCount: true,
+        creator: { select: { handle: true } },
       },
     });
 
-    res.json(issues);
+    return res.json(issues);
   } catch (err) {
     next(err);
   }
 };
+
 
 
 function makeSlugWithRandomId(title: string) {

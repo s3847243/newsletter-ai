@@ -114,10 +114,12 @@ export const refreshTokenHandler = async (
   next: NextFunction
 ) => {
   try {
-    const { refreshToken } = req.body as { refreshToken?: string };
+    const refreshToken =
+      req.cookies?.refresh_token ||
+      (req.body && req.body.refreshToken); // optional fallback while migrating
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "Missing refresh token" });
+      return res.status(401).json({ message: "No refresh token" });
     }
 
     let payload: { sub: string; email: string };
@@ -152,9 +154,25 @@ export const refreshTokenHandler = async (
     const cookieSecure = isProd;
     const cookieSameSite = isProd ? "none" : "lax";
 
-    setAuthCookies(res, newAccessToken, newRefreshToken, {
-      secure: cookieSecure,
-      sameSite: cookieSameSite,
+    // setAuthCookies(res, newAccessToken, newRefreshToken, {
+    //   secure: cookieSecure,
+    //   sameSite: cookieSameSite,
+    // });
+     // cross-site (Vercel frontend + separate API domain) => SameSite=None + Secure
+    res.cookie("access_token", newAccessToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      path: "/",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refresh_token", newRefreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     });
     return res.json({
       user: {
