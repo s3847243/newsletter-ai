@@ -4,13 +4,17 @@ import { CreatorPublic } from "@/types/creator";
 import { PublicIssueSummary, PublicIssuesResponse } from "@/types/creator";
 
 async function getCreator(handle: string): Promise<CreatorPublic | null> {
-  const res = await fetch(`${API_BASE_URL}/public/creators/${handle}`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/public/creators/${handle}`, {
     next: { revalidate: 60 },
   });
   if (!res.ok) return null;
   return (await res.json()) as CreatorPublic;
 }
-
+const fmt = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
 async function getRecentIssues(handle: string): Promise<PublicIssueSummary[]> {
   const res = await fetch(
     `${API_BASE_URL}/public/creators/${handle}/issues?page=1&pageSize=20`,
@@ -214,14 +218,7 @@ export default async function PublicCreatorPage({
                     </h3>
                     {issue.publishedAt && (
                       <span className="text-sm text-neutral-500 font-light flex-shrink-0">
-                        {new Date(issue.publishedAt).toLocaleDateString(
-                          "en-US",
-                          {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          }
-                        )}
+                        {fmt.format(new Date(issue.publishedAt))}
                       </span>
                     )}
                   </div>
