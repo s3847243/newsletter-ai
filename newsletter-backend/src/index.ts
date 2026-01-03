@@ -16,15 +16,30 @@ import cookieParser from "cookie-parser";
 const app = express();
 app.use(cookieParser());
 
+const allowedOrigins = new Set([
+  "http://localhost:3000",
+  "https://newsletter-ai-ashy.vercel.app",
+]);
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "https://newsletter-ai-ashy.vercel.app",
-    ],
+    origin: (origin, cb) => {
+      // allow non-browser requests (Postman/curl) where origin may be undefined
+      if (!origin) return cb(null, true);
+
+      if (allowedOrigins.has(origin)) return cb(null, true);
+
+      return cb(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
   })
 );
+
+// IMPORTANT: respond to preflight for all routes
+app.options("*", cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
