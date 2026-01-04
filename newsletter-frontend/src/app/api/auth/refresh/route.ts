@@ -25,19 +25,19 @@ export async function POST() {
   }
 
   const res = NextResponse.json({ user: data.user }, { status: 200 });
-
-  res.cookies.set("access_token", data.accessToken, {
+  const isProd = process.env.NODE_ENV === "production";
+  res.cookies.set("access_token", data.newAccessToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: "lax",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     path: "/",
     maxAge: 15 * 60,
   });
 
-  res.cookies.set("refresh_token", data.refreshToken, {
+  res.cookies.set("refresh_token", data.newRefreshToken, {
     httpOnly: true,
-    secure: true,
-    sameSite: "lax",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     path: "/",
     maxAge: 30 * 24 * 60 * 60,
   });
