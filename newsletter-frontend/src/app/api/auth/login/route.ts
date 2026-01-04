@@ -13,13 +13,17 @@ export async function POST(req: Request) {
 
   const text = await upstream.text();
   const data = text ? JSON.parse(text) : null;
-
+  
   if (!upstream.ok) {
     return NextResponse.json(data ?? { message: "Login failed" }, { status: upstream.status });
   }
-
+  if (!data?.accessToken || !data?.refreshToken) {
+    return NextResponse.json(
+      { message: "Backend did not return tokens", received: data },
+      { status: 500 }
+    );
+  }
   const isProd = process.env.NODE_ENV === "production";
-
   const res = NextResponse.json({ user: data.user }, { status: 200 });
 
   res.cookies.set("access_token", data.accessToken, {

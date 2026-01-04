@@ -1,19 +1,23 @@
-import { apiFetchServer } from "@/lib/apiFetchServer";
 import SidebarClient from "@/components/dashboard/SidebarClient";
 import TopbarClient from "@/components/dashboard/TopbarClient";
 import { redirect } from "next/navigation";
 import { ReactNode } from "react";
+import { cookies } from "next/headers";
+
 type Me = { id: string; email: string };
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  let me: Me | null = null;
+  const cookieHeader = (await cookies()).toString();
 
-  try {
-    me = await apiFetchServer<Me>("/auth/me", { method: "GET" });
-  } catch {
-    me = null;
-    redirect("/login")
-  }
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/proxy/auth/me`, {
+    method: "GET",
+    headers: { Cookie: cookieHeader },
+    cache: "no-store",
+  });
+
+  
+
+  const me = (await res.json()) as Me;
 
   return (
     <div className="h-screen flex bg-gradient-to-br from-neutral-50 via-white to-neutral-50 overflow-hidden">

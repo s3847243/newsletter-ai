@@ -13,9 +13,6 @@ import { useRouter } from "next/navigation";
 
 interface AuthContextValue {
   user: AuthUser | null;
-  // accessToken: string | null;
-  // refreshToken: string | null;
-  // setAuth: (resp: AuthResponse) => void;
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -99,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await refreshMe();
 
-      router.refresh();
+      // router.refresh();
       router.push("/dashboard");
     },
     [router, refreshMe]
@@ -151,18 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   //     router.push("/login");
   //   }
   // }, [router]);
-    const logout = useCallback(async () => {
-      try {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          credentials: "include",
-        });
-      } finally {
-        setUser(null);
-        router.refresh();
-        router.push("/login");
-      }
-    }, [router]);
+const logout = useCallback(async () => {
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
+  } finally {
+    setUser(null);
+    router.push("/");
+  }
+}, [router]);
+
 
   const value: AuthContextValue = {
     user,

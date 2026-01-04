@@ -4,9 +4,9 @@ import { API_BASE_URL } from "./config";
 // let currentRefreshToken: string | null = null;
 function shouldSkipRefresh(path: string) {
   return (
-    // path.startsWith("/auth/login") ||
-    // path.startsWith("/auth/register") ||
-    // path.startsWith("/auth/refresh") ||
+    path.startsWith("/auth/login") ||
+    path.startsWith("/auth/register") ||
+    path.startsWith("/auth/refresh") ||
     path.startsWith("/public/")
   );
 }

@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/apiClient";
 export default function LoginPage() {
-  const { login, isAuthenticated, loading } = useAuth();
+  const { login, isAuthenticated, loading,user } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,10 +16,9 @@ export default function LoginPage() {
   const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && isAuthenticated) {
-      router.replace("/dashboard");
-    }
-  }, [loading, isAuthenticated, router]);
+    if (loading) return;
+    if (user) router.replace("/dashboard");
+  }, [loading, user, router]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
