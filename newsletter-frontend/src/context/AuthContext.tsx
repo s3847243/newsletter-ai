@@ -76,37 +76,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-       // backend sets cookies
-      await apiFetch("/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let data: any = null;
+        if (text.trim()) {
+          try {
+            data = JSON.parse(text);
+          } catch {
+            data = text;
+          }
+        }
+        const message = (data && data.message) || res.statusText || "Login failed";
+        throw new Error(message);
+      }
+
       await refreshMe();
+
+      router.refresh();
       router.push("/dashboard");
     },
     [router, refreshMe]
   );
 
-  const register = useCallback(
-    async (name: string, email: string, password: string) => {
-      await apiFetch("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ name, email, password }),
-      });
-      router.push(`/verify-email/sent?email=${encodeURIComponent(email)}`);
-    },
-    [ router]
-  );
+  // const register = useCallback(
+  //   async (name: string, email: string, password: string) => {
+  //     await apiFetch("/auth/register", {
+  //       method: "POST",
+  //       body: JSON.stringify({ name, email, password }),
+  //     });
+  //     router.push(`/verify-email/sent?email=${encodeURIComponent(email)}`);
+  //   },
+  //   [ router]
+  // );
+    const register = useCallback(
+      async (name: string, email: string, password: string) => {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ name, email, password }),
+        });
 
-  const logout = useCallback(async () => {
-    try {
-      await apiFetch("/auth/logout", { method: "POST" });
-    } finally {
-      setUser(null);
-      router.push("/login");
-    }
-  }, [router]);
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          let data: any = null;
+          if (text.trim()) {
+            try {
+              data = JSON.parse(text);
+            } catch {
+              data = text;
+            }
+          }
+          const message =
+            (data && data.message) || res.statusText || "Registration failed";
+          throw new Error(message);
+        }
+
+        router.push(`/verify-email/sent?email=${encodeURIComponent(email)}`);
+      },
+      [router]
+    );
+  // const logout = useCallback(async () => {
+  //   try {
+  //     await apiFetch("/auth/logout", { method: "POST" });
+  //   } finally {
+  //     setUser(null);
+  //     router.push("/login");
+  //   }
+  // }, [router]);
+    const logout = useCallback(async () => {
+      try {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+        });
+      } finally {
+        setUser(null);
+        router.refresh();
+        router.push("/login");
+      }
+    }, [router]);
 
   const value: AuthContextValue = {
     user,

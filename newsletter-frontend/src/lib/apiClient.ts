@@ -4,9 +4,9 @@ import { API_BASE_URL } from "./config";
 // let currentRefreshToken: string | null = null;
 function shouldSkipRefresh(path: string) {
   return (
-    path.startsWith("/auth/login") ||
-    path.startsWith("/auth/register") ||
-    path.startsWith("/auth/refresh") ||
+    // path.startsWith("/auth/login") ||
+    // path.startsWith("/auth/register") ||
+    // path.startsWith("/auth/refresh") ||
     path.startsWith("/public/")
   );
 }
@@ -16,80 +16,58 @@ function shouldSkipRefresh(path: string) {
 // }
 
 async function refreshTokens() {
-  // const { refreshToken } = loadAuth();
 
-  // if (!refreshToken) {
-  //   clearAuth();
-  //   throw new ApiError("No refresh token", 401);
-  // }
-
-  // const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+  // const cookieRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
   //   method: "POST",
-  //   headers: {
-  //     "Content-Type": "application/json",
-  //   },
-  //   body: JSON.stringify({ refreshToken: currentRefreshToken }),
+  //   credentials: "include",
   // });
-  const cookieRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+  // it is now a next route
+  const res = await fetch(`/api/auth/refresh`, {
     method: "POST",
     credentials: "include",
   });
   
-  if (cookieRes.ok) {
-    // In cookie mode you might not return tokens at all.
-    // We return null because access token is now in cookies.
-    return null;
-  }
-  //  // 2) Fallback to your existing refresh-token-in-body flow
-  // const { refreshToken } = loadAuth();
-
-  // if (!refreshToken && !currentRefreshToken) {
-  //   clearAuth();
-  //   throw new ApiError("No refresh token", 401);
+  // if (cookieRes.ok) {
+  //   return null;
   // }
-  const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
-  });
-  // const text = await res.text();
-  // const data = text ? JSON.parse(text) : null;
-  // if (!res.ok) {
-  //   clearAuth();
-  //   const message =
-  //     (data && data.message) || res.statusText || "Failed to refresh token";
-  //   throw new ApiError(message, res.status, data);
-  // }
-    if (!res.ok) {
-      // refresh failed -> user is effectively logged out
-      const text = await res.text().catch(() => "");
-      let data: any = null;
+  if (res.ok) return null;
 
-      if (text.trim()) {
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = text;
-        }
+  // const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+  //   method: "POST",
+  //   credentials: "include",
+  // });
+
+    // if (!res.ok) {
+    //   const text = await res.text().catch(() => "");
+    //   let data: any = null;
+
+    //   if (text.trim()) {
+    //     try {
+    //       data = JSON.parse(text);
+    //     } catch {
+    //       data = text;
+    //     }
+    //   }
+
+    //   const message =
+    //     (data && data.message) || res.statusText || "Failed to refresh token";
+
+    //   throw new ApiError(message, res.status, data);
+    // }
+    const text = await res.text().catch(() => "");
+    let data: any = null;
+
+    if (text.trim()) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
       }
-
-      const message =
-        (data && data.message) || res.statusText || "Failed to refresh token";
-
-      throw new ApiError(message, res.status, data);
     }
 
-
-  // const data = await res.json() as {
-  //   user: { id: string; email: string; name?: string };
-  //   accessToken: string;
-  //   refreshToken: string;
-  // };
-
-  // currentAccessToken = data.accessToken;
-  // currentRefreshToken = data.refreshToken;
-  // saveAuth(data);
-
-
+    const message =
+      (data && data.message) || res.statusText || "Failed to refresh token";
+    throw new ApiError(message, res.status, data);
   }
 
 async function internalFetch<T>(
@@ -97,7 +75,6 @@ async function internalFetch<T>(
   options: RequestInit,
   allowRetry: boolean
 ): Promise<T> {
-  // const { accessToken } = loadAuth();
 
  const isFormData = options.body instanceof FormData;
 
@@ -108,12 +85,13 @@ async function internalFetch<T>(
   if (!isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
-
-  // if (accessToken) {
-  //   headers["Authorization"] = `Bearer ${accessToken}`;
-  // }
-
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  // const res = await fetch(`${API_BASE_URL}${path}`, {
+  //   ...options,
+  //   headers,
+  //   credentials: "include", 
+  // });
+  // MAIN CHANGE: call the Next proxy
+  const res = await fetch(`/api/proxy${path}`, {
     ...options,
     headers,
     credentials: "include", 
@@ -126,11 +104,6 @@ async function internalFetch<T>(
     try {
       await refreshTokens();
 
-      // const retryHeaders: HeadersInit = {
-      //   "Content-Type": "application/json",
-      //   ...(options.headers || {}),
-      //   Authorization: `Bearer ${newAccessToken}`,
-      // };
       const retryHeaders: Record<string, string> = {
         ...(options.headers as Record<string, string> | undefined),
       };
@@ -139,15 +112,16 @@ async function internalFetch<T>(
         retryHeaders["Content-Type"] = "application/json";
       }
 
-      // if (newAccessToken) {
-      //   (retryHeaders as any)["Authorization"] = `Bearer ${newAccessToken}`;
-      // }
-
-      const retryRes = await fetch(`${API_BASE_URL}${path}`, {
-        ...options,
-        headers: retryHeaders,
-        credentials: "include",
-      });
+      // const retryRes = await fetch(`${API_BASE_URL}${path}`, {
+      //   ...options,
+      //   headers: retryHeaders,
+      //   credentials: "include",
+      // });
+       const retryRes = await fetch(`/api/proxy${path}`, {
+          ...options,
+          headers: retryHeaders,
+          credentials: "include",
+        });
 
       return await parseResponse<T>(retryRes);
     } catch (err) {

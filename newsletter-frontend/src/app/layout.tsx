@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { AuthProvider } from "@/context/AuthContext";
 import { Inter } from "next/font/google";
 
-export const inter = Inter({
+ const inter = Inter({
   subsets: ["latin"],
   display: "swap", 
 });

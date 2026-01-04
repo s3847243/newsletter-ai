@@ -87,21 +87,19 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const cookieSecure = isProd;
     const cookieSameSite = isProd ? "none" : "lax";
     
-    const accessToken = signAccessToken({ id: user.id, email: user.email });
-    const refreshToken = signRefreshToken({ id: user.id, email: user.email });
-    setAuthCookies(res, accessToken, refreshToken, {
-      secure: cookieSecure,
-      sameSite: cookieSameSite,
+    // const accessToken = signAccessToken({ id: user.id, email: user.email });
+    // const refreshToken = signRefreshToken({ id: user.id, email: user.email });
+    // setAuthCookies(res, accessToken, refreshToken, {
+    //   secure: cookieSecure,
+    //   sameSite: cookieSameSite,
       
-    });
+    // });
     res.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-      },
-      accessToken,
-      refreshToken,
+      }
     });
   } catch (err) {
     next(err);
@@ -159,29 +157,29 @@ export const refreshTokenHandler = async (
     //   sameSite: cookieSameSite,
     // });
      // cross-site (Vercel frontend + separate API domain) => SameSite=None + Secure
-    res.cookie("access_token", newAccessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      path: "/",
-      maxAge: 15 * 60 * 1000,
-    });
+    // res.cookie("access_token", newAccessToken, {
+    //   httpOnly: true,
+    //   secure: isProd,
+    //   sameSite: isProd ? "none" : "lax",
+    //   path: "/",
+    //   maxAge: 15 * 60 * 1000,
+    // });
 
-    res.cookie("refresh_token", newRefreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      path: "/",
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
+    // res.cookie("refresh_token", newRefreshToken, {
+    //   httpOnly: true,
+    //   secure: isProd,
+    //   sameSite: isProd ? "none" : "lax",
+    //   path: "/",
+    //   maxAge: 30 * 24 * 60 * 60 * 1000,
+    // });
     return res.json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
       },
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
+      // accessToken: newAccessToken,
+      // refreshToken: newRefreshToken,
     });
   } catch (err) {
     next(err);

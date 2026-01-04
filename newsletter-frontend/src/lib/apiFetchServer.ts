@@ -9,7 +9,15 @@ export async function apiFetchServer<T>(
   const cookieStore = await cookies();       
   const cookieHeader = cookieStore.toString(); 
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  // const res = await fetch(`${API_BASE_URL}${path}`, {
+  //   ...options,
+  //   headers: {
+  //     ...(options.headers || {}),
+  //     Cookie: cookieHeader, 
+  //   },
+  //   cache: "no-store",
+  // });
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/api/proxy${path}`, {
     ...options,
     headers: {
       ...(options.headers || {}),
@@ -17,6 +25,7 @@ export async function apiFetchServer<T>(
     },
     cache: "no-store",
   });
+
 
   if (res.status === 204) {
     if (!res.ok) throw new Error(res.statusText || "Request failed");
